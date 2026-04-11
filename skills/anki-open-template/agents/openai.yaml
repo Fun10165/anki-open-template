@@ -1,0 +1,4 @@
+version: 1
+display_name: Anki Open Template
+short_description: Maintain a TS-driven Anki template bundle and APKG test deck.
+default_prompt: Maintain, debug, and extend this repository's generated Anki card templates without regressing cross-client behavior.

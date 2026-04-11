@@ -1,345 +1,822 @@
+<div id="anki-startup-probe" style="margin:12px 12px 0 12px;padding:8px 10px;border-radius:10px;background:#fff8db;color:#7a5d00;border:1px solid #e6cf7a;font-size:12px;line-height:1.4;">
+  probe: html loaded
+</div>
+
 <script>
-  // v1.0.0 - https://github.com/SimonLammer/anki-persistence/blob/eeb2e1a9e37c941dd63e1fe6c2a257f043c40e0d/script.js
-  if(void 0===window.Persistence){var _persistenceKey="github.com/SimonLammer/anki-persistence/",_defaultKey="_default";if(window.Persistence_sessionStorage=function(){var e=!1;try{"object"==typeof window.sessionStorage&&(e=!0,this.clear=function(){for(var e=0;e<sessionStorage.length;e++){var t=sessionStorage.key(e);0==t.indexOf(_persistenceKey)&&(sessionStorage.removeItem(t),e--)}},this.setItem=function(e,t){null==t&&(t=e,e=_defaultKey),sessionStorage.setItem(_persistenceKey+e,JSON.stringify(t))},this.getItem=function(e){return null==e&&(e=_defaultKey),JSON.parse(sessionStorage.getItem(_persistenceKey+e))},this.removeItem=function(e){null==e&&(e=_defaultKey),sessionStorage.removeItem(_persistenceKey+e)})}catch(e){}this.isAvailable=function(){return e}},window.Persistence_windowKey=function(e){var t=window[e],n=!1;"object"==typeof t&&(n=!0,this.clear=function(){t[_persistenceKey]={}},this.setItem=function(e,n){null==n&&(n=e,e=_defaultKey),t[_persistenceKey][e]=n},this.getItem=function(e){return null==e&&(e=_defaultKey),null==t[_persistenceKey][e]?null:t[_persistenceKey][e]},this.removeItem=function(e){null==e&&(e=_defaultKey),delete t[_persistenceKey][e]},null==t[_persistenceKey]&&this.clear()),this.isAvailable=function(){return n}},window.Persistence=new Persistence_sessionStorage,Persistence.isAvailable()||(window.Persistence=new Persistence_windowKey("py")),!Persistence.isAvailable()){var titleStartIndex=window.location.toString().indexOf("title"),titleContentIndex=window.location.toString().indexOf("main",titleStartIndex);titleStartIndex>0&&titleContentIndex>0&&titleContentIndex-titleStartIndex<10&&(window.Persistence=new Persistence_windowKey("qt"))}}
+(function () {
+  var probe = document.getElementById("anki-startup-probe");
+  if (probe) {
+    probe.textContent = "probe: debug bootstrap running";
+  }
+  if (window.__ankiAwesomeSelectDebugInstalled) {
+    if (probe) {
+      probe.textContent = "probe: debug bootstrap reused";
+    }
+    return;
+  }
+  window.__ankiAwesomeSelectDebugInstalled = true;
+  function showDebug(message) {
+    try {
+      var panel = document.getElementById("anki-debug-panel");
+      if (!panel) {
+        panel = document.createElement("pre");
+        panel.id = "anki-debug-panel";
+        panel.style.whiteSpace = "pre-wrap";
+        panel.style.wordBreak = "break-word";
+        panel.style.background = "#fff1f1";
+        panel.style.color = "#a40000";
+        panel.style.border = "1px solid #ffb3b3";
+        panel.style.borderRadius = "12px";
+        panel.style.padding = "12px";
+        panel.style.margin = "12px 12px 0 12px";
+        panel.style.fontSize = "12px";
+        panel.style.lineHeight = "1.5";
+        panel.style.fontFamily = "ui-monospace, SFMono-Regular, Menlo, Consolas, monospace";
+        document.addEventListener("DOMContentLoaded", function () {
+          document.body.insertBefore(panel, document.body.firstChild);
+        }, { once: true });
+        if (document.body) {
+          document.body.insertBefore(panel, document.body.firstChild);
+        }
+      }
+      panel.textContent = message;
+    } catch (_error) {}
+  }
+  window.onerror = function (message, source, lineno, colno, error) {
+    showDebug(
+      "[anki-open-template front error]\\n" +
+      "message: " + String(message) + "\\n" +
+      "source: " + String(source || "") + "\\n" +
+      "line: " + String(lineno || 0) + "\\n" +
+      "column: " + String(colno || 0) + "\\n" +
+      "stack: " + String(error && error.stack ? error.stack : "")
+    );
+  };
+  window.addEventListener("unhandledrejection", function (event) {
+    var reason = event && event.reason ? event.reason : "";
+    showDebug(
+      "[anki-open-template front rejection]\\n" +
+      String(reason && reason.stack ? reason.stack : reason)
+    );
+  });
+  if (probe) {
+    probe.textContent = "probe: debug bootstrap ready";
+  }
+})();
 </script>
 
-<div class="wrap-container">
-  <div class="body">
-    <div class="question">{{id}}.<span id="questionType" class="question-type"> </span>{{cloze:question}}</div>
-    <div class="options" id="front-options"></div>
-    <div id="front-tag"></div>
+<div id="field-store" class="hidden">
+  <div id="raw-id">{{id}}</div>
+  <div id="raw-type">{{type}}</div>
+  <div id="raw-question">{{question}}</div>
+  <div id="raw-options">{{options}}</div>
+  <div id="raw-answer">{{answer}}</div>
+  <div id="raw-notes">{{notes}}</div>
+  <div id="raw-extra">{{extra}}</div>
+  <div id="raw-audio">{{audio}}</div>
+  <div id="raw-occlusion-image">{{occlusion_image}}</div>
+  <div id="raw-tags">{{Tags}}</div>
+  <div id="raw-deck">{{Deck}}</div>
+</div>
+
+<div id="app" class="app-shell">
+  <div class="card-shell">
+    <div class="card-toolbar">
+      <div id="deck-name" class="deck-name"></div>
+      <button id="settings-trigger" class="ghost-button" type="button">卡片设置</button>
+    </div>
+
+    <div class="card-head">
+      <div class="card-meta">
+        <span id="card-id" class="card-id"></span>
+        <span id="card-type" class="card-type"></span>
+      </div>
+      <div id="tag-bar" class="tag-bar"></div>
+    </div>
+
+    <div id="prompt" class="prompt"></div>
+    <div id="front-interaction" class="interaction-area"></div>
+    <div id="front-controls" class="control-row"></div>
+    <div id="front-notes" class="notes-panel notes-panel-front hidden"></div>
+    <div id="audio-panel" class="audio-panel"></div>
   </div>
 </div>
 
-<div id="front-footer" class="footer">v3.16，作者：git9527</div>
-
-<div id="settingsModal" class="modal">
-
+<div id="settings-modal" class="modal hidden">
+  <div class="modal-card">
+    <div class="modal-head">
+      <div>卡片设置</div>
+      <button id="settings-close" class="ghost-button" type="button">关闭</button>
+    </div>
+    <div class="settings-grid">
+      <label class="setting-item"><span>显示题型</span><input id="setting-show-type" type="checkbox"></label>
+      <label class="setting-item"><span>显示牌组</span><input id="setting-show-deck" type="checkbox"></label>
+      <label class="setting-item"><span>正面显示解析</span><input id="setting-show-notes-front" type="checkbox"></label>
+      <label class="setting-item"><span>自动翻转</span><input id="setting-auto-flip" type="checkbox"></label>
+      <label class="setting-item"><span>随机选项</span><input id="setting-random-options" type="checkbox"></label>
+      <label class="setting-item"><span>答题统计</span><input id="setting-choice-stats" type="checkbox"></label>
+      <label class="setting-item">
+        <span>填空输入样式</span>
+        <select id="setting-fill-mode">
+          <option value="line">横线</option>
+          <option value="box">方框</option>
+          <option value="mask">遮挡</option>
+        </select>
+      </label>
+      <label class="setting-item">
+        <span>遮挡顺序</span>
+        <select id="setting-occlusion-order">
+          <option value="tb-lr">先上下后左右</option>
+          <option value="lr-tb">先左右后上下</option>
+        </select>
+      </label>
+      <label class="setting-item">
+        <span>主题</span>
+        <select id="setting-theme">
+          <option value="warm">暖色</option>
+          <option value="mint">薄荷</option>
+          <option value="slate">石板</option>
+        </select>
+      </label>
+    </div>
+  </div>
 </div>
 
+<div id="front-footer" class="footer">V95 Rebuild · 晚期多题型模板</div>
+
 <script>
-
-  var DEFAULT_SHOW_QUESTION_TYPE = '0'
-  var DEFAULT_HIDE_OPTIONS = '0'
-  var DEFAULT_RANDOM_OPTIONS = '0'
-  var DEFAULT_DELAY_OPTIONS = '0'
-  var DEFAULT_NORMAL_OPTIONS = '0'
-  var DEFAULT_HIDE_NOTES = '0'
-  var DEFAULT_AUTO_FLIP = '1'
-
-
-  var showQuestionType = DEFAULT_SHOW_QUESTION_TYPE
-  var hideOptions = DEFAULT_HIDE_OPTIONS
-  var randomOptions = DEFAULT_RANDOM_OPTIONS
-  var delayOptions = DEFAULT_DELAY_OPTIONS
-  var normalOption = DEFAULT_NORMAL_OPTIONS
-  var hideNotes = DEFAULT_HIDE_NOTES
-  var autoFlip = DEFAULT_AUTO_FLIP
-  var isDelayOptionComing = false
-
-  function showFrontOptions(hideOption, randomOption, delayOption) {
-    var keySeq = []
-    var optionObjs = getOptionObjs(randomOption)
-    initEmptyOptionList(optionObjs)
-    var liList = ''
-    for (var i in optionObjs) {
-      var _optionObj = optionObjs[i]
-      var _option = _optionObj.label
-      if (hideOption === '1') {
-        var endIndex = _optionObj.label.indexOf("《") > -1 ? 2 : 1
-        _option = _optionObj.label.substring(0, endIndex)
+"use strict";
+(() => {
+  // src/shared.ts
+  var DEFAULT_SETTINGS = {
+    showType: true,
+    showDeck: false,
+    showNotesFront: true,
+    autoFlip: true,
+    randomOptions: false,
+    choiceStats: true,
+    fillMode: "line",
+    occlusionOrder: "tb-lr",
+    theme: "warm"
+  };
+  var STORAGE_KEYS = {
+    settings: "AAS-SETTINGS",
+    selectedPrefix: "AAS-SELECTED-",
+    fillPrefix: "AAS-FILL-",
+    occlusionPrefix: "AAS-OCCLUSION-",
+    orderPrefix: "AAS-ORDER-"
+  };
+  var OPEN_BRACE = String.fromCharCode(123);
+  var CLOSE_BRACE = String.fromCharCode(125);
+  var CLOZE_START = `${OPEN_BRACE}${OPEN_BRACE}c`;
+  var CLOZE_END = `${CLOSE_BRACE}${CLOSE_BRACE}`;
+  function trim(value) {
+    return String(value != null ? value : "").replace(/^\s+|\s+$/g, "");
+  }
+  function getText(id) {
+    const element = document.getElementById(id);
+    return element ? element.textContent || "" : "";
+  }
+  function cloneHtmlWithResolvedImages(element) {
+    const clone = element.cloneNode(true);
+    const originalImages = element.querySelectorAll("img[src]");
+    const cloneImages = clone.querySelectorAll("img[src]");
+    for (let index = 0; index < originalImages.length; index += 1) {
+      const cloneImage = cloneImages[index];
+      const originalImage = originalImages[index];
+      if (!cloneImage || !originalImage) {
+        continue;
       }
-      liList += "<li id='" + _optionObj.key + "' class='option' onclick='markSelected(this)'>" + _option + "</li>"
-      keySeq.push(_optionObj.key)
+      cloneImage.setAttribute("src", originalImage.src || originalImage.getAttribute("src") || "");
     }
-    if (Persistence.isAvailable()) {
-      Persistence.setItem('ANKI-OPTIONS-ORDER', keySeq.toString())
+    return clone.innerHTML || "";
+  }
+  function getHtml(id) {
+    const element = document.getElementById(id);
+    return element ? cloneHtmlWithResolvedImages(element) : "";
+  }
+  function readFields() {
+    return {
+      id: trim(getText("raw-id")) || "0",
+      type: trim(getText("raw-type")),
+      question: getHtml("raw-question"),
+      options: getHtml("raw-options"),
+      answer: trim(getText("raw-answer")),
+      notes: getHtml("raw-notes"),
+      extra: trim(getText("raw-extra")),
+      audio: trim(getHtml("raw-audio")),
+      occlusionImage: getHtml("raw-occlusion-image"),
+      tags: trim(getText("raw-tags")),
+      deck: trim(getText("raw-deck"))
+    };
+  }
+  function parseJSON(value, fallback) {
+    try {
+      return value ? JSON.parse(value) : fallback;
+    } catch (e) {
+      return fallback;
     }
-    if (delayOption === '1') {
-      isDelayOptionComing = true
-      setTimeout(function () {
-        document.getElementById("front-options").innerHTML = liList
-        isDelayOptionComing = false
-      }, 1500)
-    } else {
-      if (isDelayOptionComing) {
-        setTimeout(function () {
-          document.getElementById("front-options").innerHTML = liList
-        }, 1500)
+  }
+  function loadSettings() {
+    try {
+      const raw = window.localStorage.getItem(STORAGE_KEYS.settings);
+      const parsed = parseJSON(raw || "", {});
+      return { ...DEFAULT_SETTINGS, ...parsed };
+    } catch (e) {
+      return { ...DEFAULT_SETTINGS };
+    }
+  }
+  function saveSettings(settings2) {
+    try {
+      window.localStorage.setItem(STORAGE_KEYS.settings, JSON.stringify(settings2));
+    } catch (e) {
+    }
+  }
+  function loadSessionState(prefix, cardId, fallback) {
+    try {
+      const value = window.sessionStorage.getItem(prefix + cardId);
+      return value == null ? fallback : value;
+    } catch (e) {
+      return fallback;
+    }
+  }
+  function saveSessionState(prefix, cardId, value) {
+    try {
+      window.sessionStorage.setItem(prefix + cardId, value);
+    } catch (e) {
+    }
+  }
+  function splitItems(value) {
+    const normalized = trim(value);
+    if (!normalized) {
+      return [];
+    }
+    if (normalized.indexOf("||") > -1) {
+      return normalized.split("||").map((item) => trim(item)).filter(Boolean);
+    }
+    return normalized.split("\n").map((item) => trim(item)).filter(Boolean);
+  }
+  function normalizeType(rawType, fields, extra) {
+    const value = trim(rawType).toLowerCase();
+    if (value === "choice" || value === "single" || value === "multiple" || value === "选择题") {
+      return "choice";
+    }
+    if (value === "fill" || value === "cloze" || value === "填空题") {
+      return "fill";
+    }
+    if (value === "occlusion" || value === "mixed" || value === "挖空混合" || value === "图片遮挡") {
+      return "occlusion";
+    }
+    if (value === "mindmap" || value === "思维导图") {
+      return "mindmap";
+    }
+    if (trim(fields.options)) {
+      return "choice";
+    }
+    if (fields.question.indexOf(CLOZE_START) > -1) {
+      return "fill";
+    }
+    if (typeof extra.image === "string" && Array.isArray(extra.masks)) {
+      return "occlusion";
+    }
+    if (Array.isArray(extra.mindmap)) {
+      return "mindmap";
+    }
+    return "qa";
+  }
+  function typeLabel(kind, answers) {
+    if (kind === "choice") {
+      return answers.length > 1 ? "多选题" : "单选题";
+    }
+    if (kind === "fill") {
+      return "填空题";
+    }
+    if (kind === "occlusion") {
+      return "图片遮挡";
+    }
+    if (kind === "mindmap") {
+      return "思维导图";
+    }
+    return "问答题";
+  }
+  function normalizeCard(fields) {
+    const extra = parseJSON(fields.extra, {});
+    const answers = splitItems(fields.answer);
+    const kind = normalizeType(fields.type, fields, extra);
+    return {
+      id: fields.id,
+      kind,
+      question: fields.question,
+      options: splitItems(fields.options),
+      answers,
+      notes: fields.notes,
+      extra,
+      audio: fields.audio,
+      occlusionImage: fields.occlusionImage,
+      tags: fields.tags ? fields.tags.split(" ").map((item) => trim(item)).filter(Boolean) : [],
+      deck: fields.deck,
+      label: typeLabel(kind, answers)
+    };
+  }
+  function setTheme(theme) {
+    document.documentElement.setAttribute("data-theme", theme);
+  }
+  function byId(id) {
+    const element = document.getElementById(id);
+    if (!element) {
+      throw new Error(`Missing element: ${id}`);
+    }
+    return element;
+  }
+  function listToFlagMap(items) {
+    const flags = {};
+    items.forEach((item) => {
+      if (item) {
+        flags[item] = true;
+      }
+    });
+    return flags;
+  }
+  function flagMapToList(flags) {
+    return Object.keys(flags).filter((key) => flags[key]).sort();
+  }
+  function escapeAttribute(value) {
+    return value.split("&").join("&amp;").split('"').join("&quot;").split("<").join("&lt;").split(">").join("&gt;");
+  }
+  function convertMathDelimiters(text) {
+    let result = "";
+    let index = 0;
+    let inInline = false;
+    let inBlock = false;
+    while (index < text.length) {
+      const current = text.charAt(index);
+      const next = text.charAt(index + 1);
+      if (current === "\\") {
+        if (next === "$") {
+          result += "$";
+          index += 2;
+          continue;
+        }
+        result += current;
+        index += 1;
+        continue;
+      }
+      if (current === "$" && next === "$" && !inInline) {
+        result += inBlock ? "\\]" : "\\[";
+        inBlock = !inBlock;
+        index += 2;
+        continue;
+      }
+      if (current === "$" && !inBlock) {
+        result += inInline ? "\\)" : "\\(";
+        inInline = !inInline;
+        index += 1;
+        continue;
+      }
+      result += current;
+      index += 1;
+    }
+    return result;
+  }
+  function normalizeMathHtml(html) {
+    if (!trim(html)) {
+      return html;
+    }
+    const wrapper = document.createElement("div");
+    wrapper.innerHTML = String(html || "");
+    const walk = (node) => {
+      let child = node.firstChild;
+      while (child) {
+        if (child.nodeType === Node.TEXT_NODE) {
+          child.nodeValue = convertMathDelimiters(child.nodeValue || "");
+        } else if (child.nodeType === Node.ELEMENT_NODE) {
+          walk(child);
+        }
+        child = child.nextSibling;
+      }
+    };
+    walk(wrapper);
+    return wrapper.innerHTML;
+  }
+  function queueMathTypeset(ids) {
+    const globalMathJax = window;
+    try {
+      const api = globalMathJax.MathJax;
+      if (!api || !api.startup || !api.typesetPromise) {
+        return;
+      }
+      const nodes = ids.map((id) => document.getElementById(id)).filter((node) => Boolean(node));
+      if (!nodes.length) {
+        return;
+      }
+      api.startup.promise.then(() => {
+        if (api.typesetClear) {
+          api.typesetClear();
+        }
+        return api.typesetPromise ? api.typesetPromise(nodes) : Promise.resolve();
+      }).catch(() => {
+      });
+    } catch (e) {
+    }
+  }
+  function renderCloze(question, mode, fillMode, draft) {
+    let html = "";
+    let cursor = 0;
+    let order = 0;
+    while (cursor < question.length) {
+      const start = question.indexOf(CLOZE_START, cursor);
+      if (start === -1) {
+        html += question.substring(cursor);
+        break;
+      }
+      const firstSep = question.indexOf("::", start);
+      const end = question.indexOf(CLOZE_END, firstSep + 2);
+      if (firstSep === -1 || end === -1) {
+        html += question.substring(cursor);
+        break;
+      }
+      html += question.substring(cursor, start);
+      const content = question.substring(firstSep + 2, end);
+      const secondSep = content.indexOf("::");
+      const answer = secondSep === -1 ? content : content.substring(0, secondSep);
+      const hint = secondSep === -1 ? "" : content.substring(secondSep + 2);
+      order += 1;
+      if (mode === "back") {
+        html += `<span class="inline-answer">${answer}</span>`;
+      } else if (fillMode) {
+        const value = (draft == null ? void 0 : draft[String(order)]) || "";
+        const placeholder = hint || "请输入";
+        html += `<span class="fill-slot fill-slot-${fillMode}"><input class="fill-input" data-fill-index="${order}" value="${escapeAttribute(value)}" placeholder="${escapeAttribute(placeholder)}"></span>`;
       } else {
-        document.getElementById("front-options").innerHTML = liList
+        html += `<span class="inline-blank">${hint || "请作答"}</span>`;
+      }
+      cursor = end + 2;
+    }
+    return normalizeMathHtml(html);
+  }
+  function renderInlineCloze(question, mode) {
+    return renderCloze(question, mode);
+  }
+  function revealAnswer() {
+    const globalWindow = window;
+    if (typeof globalWindow.pycmd === "function") {
+      globalWindow.pycmd("ans");
+      return;
+    }
+    if (globalWindow.study && typeof globalWindow.study.drawAnswer === "function") {
+      globalWindow.study.drawAnswer();
+      return;
+    }
+    if (typeof globalWindow.showAnswer === "function") {
+      globalWindow.showAnswer();
+      return;
+    }
+    if (globalWindow.anki && typeof globalWindow.sendMessage2 === "function") {
+      globalWindow.sendMessage2("ankitap", "midCenter");
+    }
+  }
+  function mountAudio(container, audioField) {
+    if (!trim(audioField)) {
+      container.innerHTML = "";
+      return;
+    }
+    container.innerHTML = `<div class="audio-player audio-player-native"><div class="audio-native-label">音频</div><div class="audio-native-body">${audioField}</div></div>`;
+  }
+  function renderTags(tags) {
+    return tags.map((tag) => `<span class="tag-chip">${tag}</span>`).join("");
+  }
+  function sortMasks(masks, order) {
+    return [...masks].sort((left, right) => {
+      if (order === "lr-tb") {
+        return Number(left.x || 0) - Number(right.x || 0) || Number(left.y || 0) - Number(right.y || 0);
+      }
+      return Number(left.y || 0) - Number(right.y || 0) || Number(left.x || 0) - Number(right.x || 0);
+    });
+  }
+
+  // src/front.ts
+  var card = normalizeCard(readFields());
+  var settings = loadSettings();
+  var state = {
+    selectedMap: listToFlagMap(splitItems(loadSessionState(STORAGE_KEYS.selectedPrefix, card.id, ""))),
+    fillDraft: parseDraft(loadSessionState(STORAGE_KEYS.fillPrefix, card.id, "{}")),
+    visibleMasks: listToFlagMap(splitItems(loadSessionState(STORAGE_KEYS.occlusionPrefix, card.id, ""))),
+    optionOrder: splitItems(loadSessionState(STORAGE_KEYS.orderPrefix, card.id, ""))
+  };
+  function parseDraft(raw) {
+    try {
+      return raw ? JSON.parse(raw) : {};
+    } catch (e) {
+      return {};
+    }
+  }
+  function renderHeader() {
+    byId("card-id").textContent = `#${card.id}`;
+    byId("card-type").textContent = settings.showType ? card.label : "";
+    byId("deck-name").textContent = settings.showDeck ? card.deck : "";
+    byId("tag-bar").innerHTML = renderTags(card.tags);
+  }
+  function renderPrompt() {
+    const prompt = byId("prompt");
+    prompt.innerHTML = card.kind === "fill" ? renderCloze(card.question, "front", settings.fillMode, state.fillDraft) : normalizeMathHtml(card.question);
+  }
+  function persistSelectedMap() {
+    saveSessionState(STORAGE_KEYS.selectedPrefix, card.id, flagMapToList(state.selectedMap).join("||"));
+  }
+  function countSelected() {
+    return flagMapToList(state.selectedMap).length;
+  }
+  function getChoiceOrder() {
+    const items = card.options.map((label, index) => ({ key: String(index + 1), label }));
+    if (!settings.randomOptions) {
+      return items;
+    }
+    if (state.optionOrder.length === items.length) {
+      const arranged = state.optionOrder.map((key) => items.find((item) => item.key === key)).filter((item) => Boolean(item));
+      if (arranged.length === items.length) {
+        return arranged;
       }
     }
-  }
-
-  function initEmptyOptionList(optionObjs) {
-    var liList = ''
-    for (var i in optionObjs) {
-      liList += "<li class='option'></li>"
+    const shuffled = [...items];
+    for (let index = shuffled.length - 1; index > 0; index -= 1) {
+      const randomIndex = Math.floor(Math.random() * (index + 1));
+      [shuffled[index], shuffled[randomIndex]] = [shuffled[randomIndex], shuffled[index]];
     }
-    document.getElementById("front-options").innerHTML = liList
+    state.optionOrder = shuffled.map((item) => item.key);
+    saveSessionState(STORAGE_KEYS.orderPrefix, card.id, state.optionOrder.join("||"));
+    return shuffled;
   }
-
-  function getOptionObjs(randomOption) {
-    var optionArray = '{{options}}'.trim().split("||")
-    var optionObjs = []
-    for (var i in optionArray) {
-      optionObjs.push({
-        key: Number.parseInt(i) + 1,
-        label: optionArray[i]
-      })
-    }
-    if (randomOption === '1') {
-      for (let i = 1; i < optionObjs.length; i++) {
-        const random = Math.floor(Math.random() * (i + 1))
-        const temp = optionObjs[i]
-        optionObjs[i] = optionObjs[random]
-        optionObjs[random] = temp
-      }
-    }
-    return optionObjs
-  }
-
-  function getSelectedKey() {
-    return normalOption === '1' ? 'selected' : 'selected-light'
-  }
-
-  function markSelected(li) {
-    var selectedKey = getSelectedKey()
-    // 对应多选
-    if ("{{answer}}".indexOf('||') > 0) {
-      if (Persistence.isAvailable()) {
-        var selectedArray = Persistence.getItem('ANKI-SELECTED') ? Persistence.getItem('ANKI-SELECTED').split(',') : []
-        if (li.className.indexOf(selectedKey) > 0) {
-          selectedArray.splice(selectedArray.indexOf(li.id), 1)
+  function bindChoiceButtons() {
+    document.querySelectorAll("[data-option-key]").forEach((button) => {
+      button.onclick = () => {
+        const key = button.getAttribute("data-option-key") || "";
+        if (!key) {
+          return;
+        }
+        if (card.answers.length > 1) {
+          state.selectedMap[key] = !state.selectedMap[key];
         } else {
-          selectedArray.push(li.id)
+          state.selectedMap = { [key]: true };
         }
-        selectedArray.sort()
-        Persistence.setItem('ANKI-SELECTED', selectedArray.toString())
-        if (selectedArray.length === "{{answer}}".trim().split('||').length && autoFlip === '1') {
-          setTimeout(function () {
-            flipToBack()
-          }, 100)
+        persistSelectedMap();
+        renderChoice();
+        if (settings.autoFlip && countSelected() === (card.answers.length || 1)) {
+          revealAnswer();
+        }
+      };
+    });
+  }
+  function renderChoice() {
+    const options = getChoiceOrder();
+    const html = options.map((option, index) => {
+      const selectedClass = state.selectedMap[option.key] ? " selected-option" : "";
+      return `<button class="option-card${selectedClass}" type="button" data-option-key="${option.key}"><span class="option-index">${String.fromCharCode(65 + index)}</span><span class="option-label">${normalizeMathHtml(option.label)}</span></button>`;
+    }).join("");
+    byId("front-interaction").innerHTML = `<div class="option-list">${html}</div>`;
+    byId("front-controls").innerHTML = "";
+    bindChoiceButtons();
+  }
+  function persistFillDraft() {
+    const draft = {};
+    document.querySelectorAll(".fill-input").forEach((input) => {
+      const index = input.getAttribute("data-fill-index") || "";
+      if (index) {
+        draft[index] = input.value;
+      }
+    });
+    state.fillDraft = draft;
+    saveSessionState(STORAGE_KEYS.fillPrefix, card.id, JSON.stringify(draft));
+  }
+  function bindFillInputs() {
+    document.querySelectorAll(".fill-input").forEach((input) => {
+      input.oninput = () => {
+        persistFillDraft();
+      };
+      input.onkeydown = (event) => {
+        if (event.key === "Enter") {
+          persistFillDraft();
+          if (settings.autoFlip) {
+            revealAnswer();
+          }
+        }
+      };
+    });
+  }
+  function renderFillControls() {
+    byId("front-interaction").innerHTML = '<div class="info-card">填写答案后，可点击检查或直接翻到背面。</div>';
+    byId("front-controls").innerHTML = '<button class="ghost-button" type="button" id="fill-submit">检查填写</button><button class="ghost-button" type="button" id="fill-clear">清空输入</button>';
+    byId("fill-submit").onclick = () => {
+      persistFillDraft();
+      if (settings.autoFlip) {
+        revealAnswer();
+      }
+    };
+    byId("fill-clear").onclick = () => {
+      state.fillDraft = {};
+      saveSessionState(STORAGE_KEYS.fillPrefix, card.id, "{}");
+      renderPrompt();
+      bindFillInputs();
+    };
+    bindFillInputs();
+  }
+  function getOcclusionMasks() {
+    const masks = Array.isArray(card.extra.masks) ? card.extra.masks : [];
+    return sortMasks(masks, settings.occlusionOrder);
+  }
+  function persistVisibleMasks(masks) {
+    const visible = masks.map((mask, index) => String(mask.id || index + 1)).filter((id) => state.visibleMasks[id]);
+    saveSessionState(STORAGE_KEYS.occlusionPrefix, card.id, visible.join("||"));
+  }
+  function bindOcclusionButtons(masks) {
+    document.querySelectorAll("[data-mask-id]").forEach((button) => {
+      button.onclick = () => {
+        const id = button.getAttribute("data-mask-id") || "";
+        if (!id) {
+          return;
+        }
+        state.visibleMasks[id] = !state.visibleMasks[id];
+        persistVisibleMasks(masks);
+        renderOcclusion();
+      };
+    });
+    byId("mask-next").onclick = () => {
+      for (let index = 0; index < masks.length; index += 1) {
+        const id = String(masks[index].id || index + 1);
+        if (!state.visibleMasks[id]) {
+          state.visibleMasks[id] = true;
+          break;
         }
       }
-      if (li.className.indexOf(selectedKey) > 0) {
-        li.className = "option"
+      persistVisibleMasks(masks);
+      renderOcclusion();
+    };
+    byId("mask-toggle").onclick = () => {
+      const allShown = masks.every((mask, index) => state.visibleMasks[String(mask.id || index + 1)]);
+      state.visibleMasks = {};
+      if (!allShown) {
+        masks.forEach((mask, index) => {
+          state.visibleMasks[String(mask.id || index + 1)] = true;
+        });
+      }
+      persistVisibleMasks(masks);
+      renderOcclusion();
+    };
+  }
+  function renderOcclusion() {
+    const masks = getOcclusionMasks();
+    if (!trim(card.occlusionImage) || !masks.length) {
+      byId("front-interaction").innerHTML = '<div class="info-card">图片遮挡数据无效，已跳过交互渲染。</div>';
+      byId("front-controls").innerHTML = "";
+      return;
+    }
+    const maskHtml = masks.map((mask, index) => {
+      const id = String(mask.id || index + 1);
+      const revealed = state.visibleMasks[id] ? " is-revealed" : "";
+      return `<button class="occlusion-mask${revealed}" type="button" data-mask-id="${id}" style="left:${Number(mask.x || 0)}%;top:${Number(mask.y || 0)}%;width:${Number(mask.w || 10)}%;height:${Number(mask.h || 10)}%;"><span>${mask.label || ""}</span></button>`;
+    }).join("");
+    byId("front-interaction").innerHTML = `<div class="occlusion-shell"><div class="occlusion-canvas">${card.occlusionImage}${maskHtml}</div></div>`;
+    byId("front-controls").innerHTML = '<button class="ghost-button" type="button" id="mask-next">显示下一个挖空</button><button class="ghost-button" type="button" id="mask-toggle">切换全部遮挡</button>';
+    bindOcclusionButtons(masks);
+  }
+  function renderMindmapNode(node) {
+    const children = Array.isArray(node.children) ? node.children : [];
+    const toggle = children.length ? "▸" : "•";
+    const childHtml = children.length ? `<ul class="mindmap-children">${children.map((child) => renderMindmapNode(child)).join("")}</ul>` : "";
+    return `<li class="mindmap-node"><button class="mindmap-toggle" type="button">${toggle}</button><div class="mindmap-label">${renderInlineCloze(String(node.text || ""), "front")}</div>${childHtml}</li>`;
+  }
+  function bindMindmapButtons() {
+    document.querySelectorAll(".mindmap-toggle").forEach((button) => {
+      button.onclick = () => {
+        const node = button.parentElement;
+        if (node) {
+          node.classList.toggle("is-collapsed");
+        }
+      };
+    });
+  }
+  function renderMindmap() {
+    const tree = Array.isArray(card.extra.mindmap) ? card.extra.mindmap : [];
+    byId("front-interaction").innerHTML = `<ul class="mindmap-root">${tree.map((node) => renderMindmapNode(node)).join("")}</ul>`;
+    byId("front-controls").innerHTML = "";
+    bindMindmapButtons();
+  }
+  function renderNotes() {
+    const notes = byId("front-notes");
+    if (!settings.showNotesFront || !trim(card.notes)) {
+      notes.className = "notes-panel notes-panel-front hidden";
+      notes.innerHTML = "";
+      return;
+    }
+    notes.className = "notes-panel notes-panel-front";
+    notes.innerHTML = `<div class="notes-title">解析 / 笔记</div><div class="notes-content">${normalizeMathHtml(card.notes)}</div>`;
+  }
+  function bindBooleanSetting(id, key) {
+    const input = byId(id);
+    input.checked = settings[key];
+    input.onchange = () => {
+      settings[key] = input.checked;
+      saveSettings(settings);
+      if (key === "randomOptions") {
+        state.optionOrder = [];
+        saveSessionState(STORAGE_KEYS.orderPrefix, card.id, "");
+      }
+      renderAll();
+    };
+  }
+  function bindSelectSetting(id, key) {
+    const input = byId(id);
+    input.value = settings[key];
+    input.onchange = () => {
+      if (key === "fillMode") {
+        settings.fillMode = input.value;
+      } else if (key === "occlusionOrder") {
+        settings.occlusionOrder = input.value;
       } else {
-        li.className = "option " + selectedKey
+        settings.theme = input.value;
       }
-    } else {
-      // 单选
-      for (var option of document.getElementsByClassName('option')) { option.className = 'option'}
-      li.className = "option " + selectedKey
-      if (Persistence.isAvailable()) {
-        Persistence.setItem('ANKI-SELECTED', li.id)
+      saveSettings(settings);
+      renderAll();
+    };
+  }
+  function bindSettings() {
+    byId("settings-trigger").onclick = () => {
+      byId("settings-modal").className = "modal";
+    };
+    byId("settings-close").onclick = () => {
+      byId("settings-modal").className = "modal hidden";
+    };
+    bindBooleanSetting("setting-show-type", "showType");
+    bindBooleanSetting("setting-show-deck", "showDeck");
+    bindBooleanSetting("setting-show-notes-front", "showNotesFront");
+    bindBooleanSetting("setting-auto-flip", "autoFlip");
+    bindBooleanSetting("setting-random-options", "randomOptions");
+    bindBooleanSetting("setting-choice-stats", "choiceStats");
+    bindSelectSetting("setting-fill-mode", "fillMode");
+    bindSelectSetting("setting-occlusion-order", "occlusionOrder");
+    bindSelectSetting("setting-theme", "theme");
+  }
+  function bindSpaceFlip() {
+    document.onkeydown = (event) => {
+      const target = event.target;
+      const tagName = (target == null ? void 0 : target.tagName.toLowerCase()) || "";
+      if (tagName === "input" || tagName === "textarea") {
+        return;
       }
-      if (autoFlip === '1') {
-        setTimeout(function () {
-          flipToBack()
-        }, 100)
+      if (event.keyCode === 32) {
+        if (typeof event.preventDefault === "function") {
+          event.preventDefault();
+        } else {
+          event.returnValue = false;
+        }
+        revealAnswer();
       }
+    };
+  }
+  function renderInteraction() {
+    if (card.kind === "choice") {
+      renderChoice();
+      return;
     }
-  }
-
-  function flipToBack () {
-    if (typeof pycmd !== "undefined") {
-      pycmd("ans")
-    } else if (typeof study !== "undefined") {
-      study.drawAnswer()
-    } else if (typeof AnkiDroidJS !== "undefined") {
-      showAnswer()
-    } else if (window.anki && window.sendMessage2) {
-      window.sendMessage2("ankitap", "midCenter")
+    if (card.kind === "fill") {
+      renderFillControls();
+      return;
     }
-  }
-
-  function showTags () {
-    var tags = "{{Tags}}"
-    if (!tags) return
-    tags = tags.split(' ')
-    var tagList = '<span class="tag-title">标签: </span>'
-    for (var tag of tags) {
-      if (tag) {
-        tagList += '<span class="single-tag">' + tag + '</span>'
-      }
+    if (card.kind === "occlusion") {
+      renderOcclusion();
+      return;
     }
-    document.getElementById("front-tag").innerHTML = tagList
-  }
-
-  function showSettings() {
-    document.getElementById("settingsModal").style.display = 'block'
-  }
-
-  function hideSettings() {
-    document.getElementById("settingsModal").style.display = 'none'
-  }
-
-  function renameIOsSendMessage(){
-    if (window['sendMessage']) {
-      window['sendMessage2'] = window['sendMessage']
-      window['sendMessage'] = null
+    if (card.kind === "mindmap") {
+      renderMindmap();
+      return;
     }
+    byId("front-interaction").innerHTML = '<div class="info-card">按空格或显示答案翻到背面。</div>';
+    byId("front-controls").innerHTML = "";
   }
-
-  function applySettings() {
-    if (Persistence.isAvailable()) {
-      showQuestionType = Persistence.getItem('ANKI-SETTINGS-SHOW-QUESTION-TYPE') || DEFAULT_SHOW_QUESTION_TYPE
-      hideOptions = Persistence.getItem('ANKI-SETTINGS-HIDE-OPTIONS') || DEFAULT_HIDE_OPTIONS
-      randomOptions = Persistence.getItem('ANKI-SETTINGS-RANDOM-OPTIONS') || DEFAULT_RANDOM_OPTIONS
-      delayOptions = Persistence.getItem('ANKI-SETTINGS-DELAY-OPTIONS') || DEFAULT_DELAY_OPTIONS
-      normalOption = Persistence.getItem('ANKI-SETTINGS-NORMAL-OPTIONS') || DEFAULT_NORMAL_OPTIONS
-      hideNotes = Persistence.getItem('ANKI-SETTINGS-HIDE-NOTES') || DEFAULT_HIDE_NOTES
-      autoFlip = Persistence.getItem('ANKI-SETTINGS-AUTO-FLIP') || DEFAULT_AUTO_FLIP
-      Persistence.setItem('ANKI-SELECTED', '')
-    }
-    document.getElementById('hide-option').checked = hideOptions === '1'
-    document.getElementById('random-option').checked = randomOptions === '1'
-    document.getElementById('show-type').checked = showQuestionType === '1'
-    document.getElementById('delay-option').checked = delayOptions === '1'
-    document.getElementById('normal-option').checked = normalOption === '1'
-    document.getElementById('hide-notes').checked = hideNotes === '1'
-    document.getElementById('auto-flip').checked = autoFlip === '1'
-    showFrontOptions(hideOptions, randomOptions, delayOptions)
-    dealQuestionType(showQuestionType)
+  function renderAll() {
+    setTheme(settings.theme);
+    renderHeader();
+    renderPrompt();
+    renderInteraction();
+    renderNotes();
+    mountAudio(byId("audio-panel"), card.audio);
+    queueMathTypeset(["prompt", "front-interaction", "front-notes"]);
   }
-
-  function switchHideOption(input) {
-    rerenderOptions(input, 'ANKI-SETTINGS-HIDE-OPTIONS')
+  function main() {
+    bindSettings();
+    bindSpaceFlip();
+    renderAll();
   }
-
-  function switchDelayOption(input) {
-    rerenderOptions(input, 'ANKI-SETTINGS-DELAY-OPTIONS')
+  main();
+})();
+</script>
+<script>
+(function () {
+  var probe = document.getElementById("anki-startup-probe");
+  if (probe) {
+    probe.style.background = "#e9fff0";
+    probe.style.borderColor = "#86d39d";
+    probe.style.color = "#176b2c";
+    probe.textContent = "probe: main script finished";
   }
-
-  function switchRandomOption(input) {
-    rerenderOptions(input, 'ANKI-SETTINGS-RANDOM-OPTIONS')
-  }
-
-  function switchNormalOption(input) {
-    extractKeyFromInputAndSave(input, 'ANKI-SETTINGS-NORMAL-OPTIONS')
-    var selectedKey = getSelectedKey()
-    for (var option of document.getElementsByClassName('option')) {
-      if (option.className.indexOf(' ') > -1) {
-        option.className = "option " + selectedKey
-      }
-    }
-  }
-
-  function switchHideNotes(input) {
-    extractKeyFromInputAndSave(input, 'ANKI-SETTINGS-HIDE-NOTES')
-  }
-
-  function switchShowType(input) {
-    extractKeyFromInputAndSave(input, 'ANKI-SETTINGS-SHOW-QUESTION-TYPE')
-    dealQuestionType(showQuestionType)
-  }
-
-  function switchAutoFlip(input) {
-    extractKeyFromInputAndSave(input, 'ANKI-SETTINGS-AUTO-FLIP')
-  }
-
-  function extractKeyFromInputAndSave(input, persistKey) {
-    var key = input.checked ? '1' : '0'
-    if (Persistence.isAvailable()) {
-      Persistence.setItem(persistKey, key)
-      if (persistKey === 'ANKI-SETTINGS-RANDOM-OPTIONS' || persistKey === 'ANKI-SETTINGS-DELAY-OPTIONS' || persistKey === 'ANKI-SETTINGS-HIDE-OPTIONS') {
-        Persistence.setItem('ANKI-SELECTED', '')
-      }
-    }
-    if (persistKey === 'ANKI-SETTINGS-HIDE-OPTIONS') {
-      hideOptions = key
-    } else if (persistKey === 'ANKI-SETTINGS-DELAY-OPTIONS') {
-      delayOptions = key
-    } else if (persistKey === 'ANKI-SETTINGS-RANDOM-OPTIONS') {
-      randomOptions = key
-    } else if (persistKey === 'ANKI-SETTINGS-NORMAL-OPTIONS') {
-      normalOption = key
-    } else if (persistKey === 'ANKI-SETTINGS-SHOW-QUESTION-TYPE') {
-      showQuestionType = key
-    } else if (persistKey === 'ANKI-SETTINGS-HIDE-NOTES') {
-      hideNotes = key
-    } else if (persistKey === 'ANKI-SETTINGS-AUTO-FLIP') {
-      autoFlip = key
-    }
-    return key
-  }
-
-  function rerenderOptions(input, persistKey) {
-    extractKeyFromInputAndSave(input, persistKey)
-    showFrontOptions(hideOptions, randomOptions, delayOptions, normalOption)
-  }
-
-  function dealQuestionType(showQuestionType) {
-    if (showQuestionType === '1') {
-      document.getElementById('questionType').innerHTML = "{{answer}}".indexOf('||') > -1 ? '【多选】' : '【单选】'
-    } else {
-      document.getElementById('questionType').innerHTML = ' '
-    }
-    if (Persistence.isAvailable()) {
-      Persistence.setItem('ANKI-SETTINGS-SHOW-QUESTION-TYPE', showQuestionType)
-    }
-  }
-
-  function addModelContent() {
-    document.getElementById('settingsModal').innerHTML = '<div class="modal-content">\n' +
-      '    <span class="close" onclick="hideSettings()">&times;</span>\n' +
-      '    <div class="settings-block">\n' +
-      '      <div class="single-setting">\n' +
-      '        <div class="setting-label">显示类型</div>\n' +
-      '        <div class="setting-switch">\n' +
-      '          <input id="show-type" class="mui-switch mui-switch-anim" type="checkbox" onchange="switchShowType(this)">\n' +
-      '        </div>\n' +
-      '      </div>\n' +
-      '      <div class="single-setting">\n' +
-      '        <div class="setting-label">隐藏选项</div>\n' +
-      '        <div class="setting-switch">\n' +
-      '          <input id="hide-option" class="mui-switch mui-switch-anim" type="checkbox" onchange="switchHideOption(this)">\n' +
-      '        </div>\n' +
-      '      </div>\n' +
-      '      <div class="single-setting">\n' +
-      '        <div class="setting-label">随机选项</div>\n' +
-      '        <div class="setting-switch">\n' +
-      '          <input id="random-option" class="mui-switch mui-switch-anim" type="checkbox" onchange="switchRandomOption(this)">\n' +
-      '        </div>\n' +
-      '      </div>\n' +
-      '      <div class="single-setting">\n' +
-      '        <div class="setting-label">延迟选项</div>\n' +
-      '        <div class="setting-switch">\n' +
-      '          <input id="delay-option" class="mui-switch mui-switch-anim" type="checkbox" onchange="switchDelayOption(this)">\n' +
-      '        </div>\n' +
-      '      </div>\n' +
-      '      <div class="single-setting">\n' +
-      '        <div class="setting-label">纯色模式</div>\n' +
-      '        <div class="setting-switch">\n' +
-      '          <input id="normal-option" class="mui-switch mui-switch-anim" type="checkbox" onchange="switchNormalOption(this)">\n' +
-      '        </div>\n' +
-      '      </div>\n' +
-      '      <div class="single-setting">\n' +
-      '        <div class="setting-label">隐藏解析</div>\n' +
-      '        <div class="setting-switch">\n' +
-      '          <input id="hide-notes" class="mui-switch mui-switch-anim" type="checkbox" onchange="switchHideNotes(this)">\n' +
-      '        </div>\n' +
-      '      </div>\n' +
-      '      <div class="single-setting">\n' +
-      '        <div class="setting-label">自动翻转</div>\n' +
-      '        <div class="setting-switch">\n' +
-      '          <input id="auto-flip" class="mui-switch mui-switch-anim" type="checkbox" onchange="switchAutoFlip(this)">\n' +
-      '        </div>\n' +
-      '      </div>\n' +
-      '    </div>\n' +
-      '  </div>'
-  }
-
-  function updateFrontFooter() {
-    document.getElementById("front-footer").insertAdjacentHTML('beforeend', '，<a href="javascript:showSettings();">卡片设置</a>，开源地址：<a href="https://github.com/git9527/anki-awesome-select">Github</a> | <a href="https://gitee.com/git9527/anki-awesome-select">Gitee</a>');
-  }
-
-  showTags()
-  renameIOsSendMessage()
-  addModelContent()
-  applySettings()
-  updateFrontFooter()
-
+})();
 </script>

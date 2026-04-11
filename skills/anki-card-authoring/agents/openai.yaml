@@ -1,0 +1,4 @@
+version: 1
+display_name: Anki Card Authoring
+short_description: Create Anki cards from simple study content without template internals.
+default_prompt: Create or revise Anki cards by choosing the right card type and filling the required fields with minimal implementation detail.

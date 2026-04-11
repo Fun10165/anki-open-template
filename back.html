@@ -1,208 +1,609 @@
+<div id="anki-startup-probe" style="margin:12px 12px 0 12px;padding:8px 10px;border-radius:10px;background:#fff8db;color:#7a5d00;border:1px solid #e6cf7a;font-size:12px;line-height:1.4;">
+  probe: html loaded
+</div>
+
 <script>
-  // v1.0.0 - https://github.com/SimonLammer/anki-persistence/blob/eeb2e1a9e37c941dd63e1fe6c2a257f043c40e0d/script.js
-  if(void 0===window.Persistence){var _persistenceKey="github.com/SimonLammer/anki-persistence/",_defaultKey="_default";if(window.Persistence_sessionStorage=function(){var e=!1;try{"object"==typeof window.sessionStorage&&(e=!0,this.clear=function(){for(var e=0;e<sessionStorage.length;e++){var t=sessionStorage.key(e);0==t.indexOf(_persistenceKey)&&(sessionStorage.removeItem(t),e--)}},this.setItem=function(e,t){null==t&&(t=e,e=_defaultKey),sessionStorage.setItem(_persistenceKey+e,JSON.stringify(t))},this.getItem=function(e){return null==e&&(e=_defaultKey),JSON.parse(sessionStorage.getItem(_persistenceKey+e))},this.removeItem=function(e){null==e&&(e=_defaultKey),sessionStorage.removeItem(_persistenceKey+e)})}catch(e){}this.isAvailable=function(){return e}},window.Persistence_windowKey=function(e){var t=window[e],n=!1;"object"==typeof t&&(n=!0,this.clear=function(){t[_persistenceKey]={}},this.setItem=function(e,n){null==n&&(n=e,e=_defaultKey),t[_persistenceKey][e]=n},this.getItem=function(e){return null==e&&(e=_defaultKey),null==t[_persistenceKey][e]?null:t[_persistenceKey][e]},this.removeItem=function(e){null==e&&(e=_defaultKey),delete t[_persistenceKey][e]},null==t[_persistenceKey]&&this.clear()),this.isAvailable=function(){return n}},window.Persistence=new Persistence_sessionStorage,Persistence.isAvailable()||(window.Persistence=new Persistence_windowKey("py")),!Persistence.isAvailable()){var titleStartIndex=window.location.toString().indexOf("title"),titleContentIndex=window.location.toString().indexOf("main",titleStartIndex);titleStartIndex>0&&titleContentIndex>0&&titleContentIndex-titleStartIndex<10&&(window.Persistence=new Persistence_windowKey("qt"))}}
+(function () {
+  var probe = document.getElementById("anki-startup-probe");
+  if (probe) {
+    probe.textContent = "probe: debug bootstrap running";
+  }
+  if (window.__ankiAwesomeSelectDebugInstalled) {
+    if (probe) {
+      probe.textContent = "probe: debug bootstrap reused";
+    }
+    return;
+  }
+  window.__ankiAwesomeSelectDebugInstalled = true;
+  function showDebug(message) {
+    try {
+      var panel = document.getElementById("anki-debug-panel");
+      if (!panel) {
+        panel = document.createElement("pre");
+        panel.id = "anki-debug-panel";
+        panel.style.whiteSpace = "pre-wrap";
+        panel.style.wordBreak = "break-word";
+        panel.style.background = "#fff1f1";
+        panel.style.color = "#a40000";
+        panel.style.border = "1px solid #ffb3b3";
+        panel.style.borderRadius = "12px";
+        panel.style.padding = "12px";
+        panel.style.margin = "12px 12px 0 12px";
+        panel.style.fontSize = "12px";
+        panel.style.lineHeight = "1.5";
+        panel.style.fontFamily = "ui-monospace, SFMono-Regular, Menlo, Consolas, monospace";
+        document.addEventListener("DOMContentLoaded", function () {
+          document.body.insertBefore(panel, document.body.firstChild);
+        }, { once: true });
+        if (document.body) {
+          document.body.insertBefore(panel, document.body.firstChild);
+        }
+      }
+      panel.textContent = message;
+    } catch (_error) {}
+  }
+  window.onerror = function (message, source, lineno, colno, error) {
+    showDebug(
+      "[anki-open-template back error]\\n" +
+      "message: " + String(message) + "\\n" +
+      "source: " + String(source || "") + "\\n" +
+      "line: " + String(lineno || 0) + "\\n" +
+      "column: " + String(colno || 0) + "\\n" +
+      "stack: " + String(error && error.stack ? error.stack : "")
+    );
+  };
+  window.addEventListener("unhandledrejection", function (event) {
+    var reason = event && event.reason ? event.reason : "";
+    showDebug(
+      "[anki-open-template back rejection]\\n" +
+      String(reason && reason.stack ? reason.stack : reason)
+    );
+  });
+  if (probe) {
+    probe.textContent = "probe: debug bootstrap ready";
+  }
+})();
 </script>
 
-<div class="wrap-container">
-  <div class="body">
-    <div class="question">{{id}}.<span id="questionType" class="question-type"> </span>{{cloze:question}}</div>
-    <div class="options" id="back-options">
-      <li class="option"> </li>
-      <li class="option"> </li>
+<div id="field-store" class="hidden">
+  <div id="raw-id">{{id}}</div>
+  <div id="raw-type">{{type}}</div>
+  <div id="raw-question">{{question}}</div>
+  <div id="raw-options">{{options}}</div>
+  <div id="raw-answer">{{answer}}</div>
+  <div id="raw-notes">{{notes}}</div>
+  <div id="raw-extra">{{extra}}</div>
+  <div id="raw-audio">{{audio}}</div>
+  <div id="raw-occlusion-image">{{occlusion_image}}</div>
+  <div id="raw-tags">{{Tags}}</div>
+  <div id="raw-deck">{{Deck}}</div>
+</div>
+
+<div id="app" class="app-shell">
+  <div class="card-shell">
+    <div class="card-toolbar">
+      <div id="deck-name" class="deck-name"></div>
+      <div id="answer-summary" class="answer-summary"></div>
     </div>
-    <div id="back-tag"></div>
+
+    <div class="card-head">
+      <div class="card-meta">
+        <span id="card-id" class="card-id"></span>
+        <span id="card-type" class="card-type"></span>
+      </div>
+      <div id="tag-bar" class="tag-bar"></div>
+    </div>
+
+    <div id="prompt" class="prompt"></div>
+    <div id="back-interaction" class="interaction-area"></div>
+    <div id="notes-panel" class="notes-panel"></div>
+    <div id="audio-panel" class="audio-panel"></div>
   </div>
-  <hr>
-
-  <script>
-    function showBackOptions() {
-      var _isNormalOption = isNormalOption()
-      var correctClass = _isNormalOption ? 'correct' : 'correct-light'
-      var wrongClass = _isNormalOption ? 'wrong' : 'wrong-light'
-      var shouldSelectClass = _isNormalOption ? 'should-select' : 'should-select-light'
-      var optionObjs = getOptionObjs()
-      var liList = ''
-      var isMulti = "{{answer}}".indexOf('||') > 0
-      for (var i in optionObjs) {
-        var _optionObj = optionObjs[i]
-        var _option = _optionObj.label
-        var _optionKey = _optionObj.key + ''
-        var _isSelected = isSelected(_optionKey)
-        var _isCorrect = isCorrectAnswer(_optionKey)
-        var _class = ''
-        if (isMulti) {
-          if (_isSelected && _isCorrect) {
-            _class = 'option ' + correctClass
-          } else if (!_isSelected && _isCorrect) {
-            _class = 'option ' + shouldSelectClass
-          } else if (_isSelected && !_isCorrect) {
-            _class = 'option ' + wrongClass
-          } else {
-            _class = 'option'
-          }
-        } else {
-          if (_isCorrect) {
-            _class = 'option ' + correctClass
-          } else {
-            _class = _isSelected ? 'option ' + wrongClass : 'option'
-          }
-        }
-        liList += "<li class='" + _class + "'>" + _option + "</li>"
-      }
-      document.getElementById("back-options").innerHTML = liList
-    }
-
-    function isCorrectAnswer(optionKey) {
-      return "{{answer}}".indexOf(optionKey) > -1
-    }
-
-    function isSelected(optionKey) {
-      if (!Persistence.isAvailable()) {
-        return false
-      }
-      return (Persistence.getItem('ANKI-SELECTED') || '').indexOf(optionKey) > -1
-    }
-
-    function getOptionObjs() {
-      var optionArray = '{{options}}'.trim().split("||")
-      var optionObjs = []
-      for (var i in optionArray) {
-        optionObjs.push({
-          key: Number.parseInt(i) + 1,
-          label: optionArray[i]
-        })
-      }
-      if (Persistence.isAvailable()) {
-        var optionsOrder = (Persistence.getItem('ANKI-OPTIONS-ORDER') || '').trim().split(',')
-        optionObjs = optionObjs.sort(function(a, b) {
-          return optionsOrder.indexOf(a.key + '') - optionsOrder.indexOf(b.key + '')
-        })
-      }
-      return optionObjs
-    }
-
-    function isNormalOption() {
-      if (Persistence.isAvailable()) {
-        return Persistence.getItem('ANKI-SETTINGS-NORMAL-OPTIONS') === '1'
-      } else {
-        return false
-      }
-    }
-
-    showBackOptions()
-  </script>
-
-  <div id="tips" class="tips">
-
-  </div>
-
 </div>
 
-<div id="notes-wrapper">
-
-</div>
-
-<div id="back-footer" class="footer">v3.16，作者：git9527</div>
+<div id="back-footer" class="footer">V95 Rebuild · 晚期多题型模板</div>
 
 <script>
-
-  function showTags () {
-    var tags = "{{Tags}}".trim()
-    if (!tags) return
-    tags = tags.split(' ')
-    var tagList = '<span class="tag-title">标签: </span>'
-    for (var tag of tags) {
-      if (tag) {
-        tagList += '<span class="single-tag">' + tag + '</span>'
-      }
-    }
-    document.getElementById("back-tag").innerHTML = tagList
+"use strict";
+(() => {
+  // src/shared.ts
+  var DEFAULT_SETTINGS = {
+    showType: true,
+    showDeck: false,
+    showNotesFront: true,
+    autoFlip: true,
+    randomOptions: false,
+    choiceStats: true,
+    fillMode: "line",
+    occlusionOrder: "tb-lr",
+    theme: "warm"
+  };
+  var STORAGE_KEYS = {
+    settings: "AAS-SETTINGS",
+    selectedPrefix: "AAS-SELECTED-",
+    fillPrefix: "AAS-FILL-",
+    occlusionPrefix: "AAS-OCCLUSION-",
+    orderPrefix: "AAS-ORDER-"
+  };
+  var OPEN_BRACE = String.fromCharCode(123);
+  var CLOSE_BRACE = String.fromCharCode(125);
+  var CLOZE_START = `${OPEN_BRACE}${OPEN_BRACE}c`;
+  var CLOZE_END = `${CLOSE_BRACE}${CLOSE_BRACE}`;
+  function trim(value) {
+    return String(value != null ? value : "").replace(/^\s+|\s+$/g, "");
   }
-
-  function numberToAlpha(numbers) {
-    var optionsOrder = []
-    if (Persistence.isAvailable()) {
-      optionsOrder = Persistence.getItem('ANKI-OPTIONS-ORDER').trim().split(',')
+  function getText(id) {
+    const element = document.getElementById(id);
+    return element ? element.textContent || "" : "";
+  }
+  function cloneHtmlWithResolvedImages(element) {
+    const clone = element.cloneNode(true);
+    const originalImages = element.querySelectorAll("img[src]");
+    const cloneImages = clone.querySelectorAll("img[src]");
+    for (let index = 0; index < originalImages.length; index += 1) {
+      const cloneImage = cloneImages[index];
+      const originalImage = originalImages[index];
+      if (!cloneImage || !originalImage) {
+        continue;
+      }
+      cloneImage.setAttribute("src", originalImage.src || originalImage.getAttribute("src") || "");
     }
-    var alphas = []
-    for (var i in numbers) {
-      var number = numbers[i]
-      if (number) {
-        if (optionsOrder.length === 0) {
-          alphas.push(String.fromCharCode(Number.parseInt(number) + 64))
-        } else {
-          alphas.push(String.fromCharCode(optionsOrder.indexOf(number) + 65))
+    return clone.innerHTML || "";
+  }
+  function getHtml(id) {
+    const element = document.getElementById(id);
+    return element ? cloneHtmlWithResolvedImages(element) : "";
+  }
+  function readFields() {
+    return {
+      id: trim(getText("raw-id")) || "0",
+      type: trim(getText("raw-type")),
+      question: getHtml("raw-question"),
+      options: getHtml("raw-options"),
+      answer: trim(getText("raw-answer")),
+      notes: getHtml("raw-notes"),
+      extra: trim(getText("raw-extra")),
+      audio: trim(getHtml("raw-audio")),
+      occlusionImage: getHtml("raw-occlusion-image"),
+      tags: trim(getText("raw-tags")),
+      deck: trim(getText("raw-deck"))
+    };
+  }
+  function parseJSON(value, fallback) {
+    try {
+      return value ? JSON.parse(value) : fallback;
+    } catch (e) {
+      return fallback;
+    }
+  }
+  function loadSettings() {
+    try {
+      const raw = window.localStorage.getItem(STORAGE_KEYS.settings);
+      const parsed = parseJSON(raw || "", {});
+      return { ...DEFAULT_SETTINGS, ...parsed };
+    } catch (e) {
+      return { ...DEFAULT_SETTINGS };
+    }
+  }
+  function loadSessionState(prefix, cardId, fallback) {
+    try {
+      const value = window.sessionStorage.getItem(prefix + cardId);
+      return value == null ? fallback : value;
+    } catch (e) {
+      return fallback;
+    }
+  }
+  function clearSessionState(prefix, cardId) {
+    try {
+      window.sessionStorage.removeItem(prefix + cardId);
+    } catch (e) {
+    }
+  }
+  function clearReviewState(cardId) {
+    clearSessionState(STORAGE_KEYS.selectedPrefix, cardId);
+    clearSessionState(STORAGE_KEYS.fillPrefix, cardId);
+    clearSessionState(STORAGE_KEYS.occlusionPrefix, cardId);
+    clearSessionState(STORAGE_KEYS.orderPrefix, cardId);
+  }
+  function splitItems(value) {
+    const normalized = trim(value);
+    if (!normalized) {
+      return [];
+    }
+    if (normalized.indexOf("||") > -1) {
+      return normalized.split("||").map((item) => trim(item)).filter(Boolean);
+    }
+    return normalized.split("\n").map((item) => trim(item)).filter(Boolean);
+  }
+  function normalizeType(rawType, fields, extra) {
+    const value = trim(rawType).toLowerCase();
+    if (value === "choice" || value === "single" || value === "multiple" || value === "选择题") {
+      return "choice";
+    }
+    if (value === "fill" || value === "cloze" || value === "填空题") {
+      return "fill";
+    }
+    if (value === "occlusion" || value === "mixed" || value === "挖空混合" || value === "图片遮挡") {
+      return "occlusion";
+    }
+    if (value === "mindmap" || value === "思维导图") {
+      return "mindmap";
+    }
+    if (trim(fields.options)) {
+      return "choice";
+    }
+    if (fields.question.indexOf(CLOZE_START) > -1) {
+      return "fill";
+    }
+    if (typeof extra.image === "string" && Array.isArray(extra.masks)) {
+      return "occlusion";
+    }
+    if (Array.isArray(extra.mindmap)) {
+      return "mindmap";
+    }
+    return "qa";
+  }
+  function typeLabel(kind, answers) {
+    if (kind === "choice") {
+      return answers.length > 1 ? "多选题" : "单选题";
+    }
+    if (kind === "fill") {
+      return "填空题";
+    }
+    if (kind === "occlusion") {
+      return "图片遮挡";
+    }
+    if (kind === "mindmap") {
+      return "思维导图";
+    }
+    return "问答题";
+  }
+  function normalizeCard(fields) {
+    const extra = parseJSON(fields.extra, {});
+    const answers = splitItems(fields.answer);
+    const kind = normalizeType(fields.type, fields, extra);
+    return {
+      id: fields.id,
+      kind,
+      question: fields.question,
+      options: splitItems(fields.options),
+      answers,
+      notes: fields.notes,
+      extra,
+      audio: fields.audio,
+      occlusionImage: fields.occlusionImage,
+      tags: fields.tags ? fields.tags.split(" ").map((item) => trim(item)).filter(Boolean) : [],
+      deck: fields.deck,
+      label: typeLabel(kind, answers)
+    };
+  }
+  function setTheme(theme) {
+    document.documentElement.setAttribute("data-theme", theme);
+  }
+  function byId(id) {
+    const element = document.getElementById(id);
+    if (!element) {
+      throw new Error(`Missing element: ${id}`);
+    }
+    return element;
+  }
+  function listToFlagMap(items) {
+    const flags = {};
+    items.forEach((item) => {
+      if (item) {
+        flags[item] = true;
+      }
+    });
+    return flags;
+  }
+  function escapeAttribute(value) {
+    return value.split("&").join("&amp;").split('"').join("&quot;").split("<").join("&lt;").split(">").join("&gt;");
+  }
+  function convertMathDelimiters(text) {
+    let result = "";
+    let index = 0;
+    let inInline = false;
+    let inBlock = false;
+    while (index < text.length) {
+      const current = text.charAt(index);
+      const next = text.charAt(index + 1);
+      if (current === "\\") {
+        if (next === "$") {
+          result += "$";
+          index += 2;
+          continue;
         }
+        result += current;
+        index += 1;
+        continue;
       }
+      if (current === "$" && next === "$" && !inInline) {
+        result += inBlock ? "\\]" : "\\[";
+        inBlock = !inBlock;
+        index += 2;
+        continue;
+      }
+      if (current === "$" && !inBlock) {
+        result += inInline ? "\\)" : "\\(";
+        inInline = !inInline;
+        index += 1;
+        continue;
+      }
+      result += current;
+      index += 1;
     }
-    alphas.sort()
-    return alphas.toString()
+    return result;
   }
-
-  function showAnswers() {
-    var correctAnswers = numberToAlpha("{{answer}}".trim().split('||'))
-    var yourChoice = '未选择'
-    if (Persistence.isAvailable()) {
-      var selectedNumbers = (Persistence.getItem('ANKI-SELECTED') || '').trim().split(',')
-      yourChoice = numberToAlpha(selectedNumbers)
-      Persistence.setItem('ANKI-SELECTED', '')
-      var showQuestionType = Persistence.getItem('ANKI-SETTINGS-SHOW-QUESTION-TYPE') || '0'
-      if (showQuestionType === '1') {
-        document.getElementById('questionType').innerHTML = "{{answer}}".indexOf('||') > -1 ? '【多选】' : '【单选】'
+  function normalizeMathHtml(html) {
+    if (!trim(html)) {
+      return html;
+    }
+    const wrapper = document.createElement("div");
+    wrapper.innerHTML = String(html || "");
+    const walk = (node) => {
+      let child = node.firstChild;
+      while (child) {
+        if (child.nodeType === Node.TEXT_NODE) {
+          child.nodeValue = convertMathDelimiters(child.nodeValue || "");
+        } else if (child.nodeType === Node.ELEMENT_NODE) {
+          walk(child);
+        }
+        child = child.nextSibling;
+      }
+    };
+    walk(wrapper);
+    return wrapper.innerHTML;
+  }
+  function queueMathTypeset(ids) {
+    const globalMathJax = window;
+    try {
+      const api = globalMathJax.MathJax;
+      if (!api || !api.startup || !api.typesetPromise) {
+        return;
+      }
+      const nodes = ids.map((id) => document.getElementById(id)).filter((node) => Boolean(node));
+      if (!nodes.length) {
+        return;
+      }
+      api.startup.promise.then(() => {
+        if (api.typesetClear) {
+          api.typesetClear();
+        }
+        return api.typesetPromise ? api.typesetPromise(nodes) : Promise.resolve();
+      }).catch(() => {
+      });
+    } catch (e) {
+    }
+  }
+  function collectClozeTokens(question) {
+    const tokens = [];
+    let cursor = 0;
+    while (cursor < question.length) {
+      const start = question.indexOf(CLOZE_START, cursor);
+      if (start === -1) {
+        break;
+      }
+      const firstSep = question.indexOf("::", start);
+      const end = question.indexOf(CLOZE_END, firstSep + 2);
+      if (firstSep === -1 || end === -1) {
+        break;
+      }
+      const content = question.substring(firstSep + 2, end);
+      const secondSep = content.indexOf("::");
+      tokens.push({
+        answer: secondSep === -1 ? content : content.substring(0, secondSep),
+        hint: secondSep === -1 ? "" : content.substring(secondSep + 2)
+      });
+      cursor = end + 2;
+    }
+    return tokens;
+  }
+  function renderCloze(question, mode, fillMode, draft) {
+    let html = "";
+    let cursor = 0;
+    let order = 0;
+    while (cursor < question.length) {
+      const start = question.indexOf(CLOZE_START, cursor);
+      if (start === -1) {
+        html += question.substring(cursor);
+        break;
+      }
+      const firstSep = question.indexOf("::", start);
+      const end = question.indexOf(CLOZE_END, firstSep + 2);
+      if (firstSep === -1 || end === -1) {
+        html += question.substring(cursor);
+        break;
+      }
+      html += question.substring(cursor, start);
+      const content = question.substring(firstSep + 2, end);
+      const secondSep = content.indexOf("::");
+      const answer = secondSep === -1 ? content : content.substring(0, secondSep);
+      const hint = secondSep === -1 ? "" : content.substring(secondSep + 2);
+      order += 1;
+      if (mode === "back") {
+        html += `<span class="inline-answer">${answer}</span>`;
+      } else if (fillMode) {
+        const value = (draft == null ? void 0 : draft[String(order)]) || "";
+        const placeholder = hint || "请输入";
+        html += `<span class="fill-slot fill-slot-${fillMode}"><input class="fill-input" data-fill-index="${order}" value="${escapeAttribute(value)}" placeholder="${escapeAttribute(placeholder)}"></span>`;
       } else {
-        document.getElementById('questionType').innerHTML = ' '
+        html += `<span class="inline-blank">${hint || "请作答"}</span>`;
       }
+      cursor = end + 2;
     }
-    document.getElementById('tips').innerHTML = '正确选项：' + correctAnswers + '&nbsp;&nbsp;&nbsp;&nbsp;你的选项：' + yourChoice
+    return normalizeMathHtml(html);
   }
-
-  function showNotes() {
-    if (document.getElementsByClassName('notes-container')[0].innerHTML) {
-      document.getElementById('notes-wrapper').style.display = 'block'
-      var totalHeight = window.innerHeight
-      var left = totalHeight - document.getElementsByClassName('wrap-container')[0].clientHeight - 140
-      if (left < 80) {
-        left = 80
+  function renderInlineCloze(question, mode) {
+    return renderCloze(question, mode);
+  }
+  function mountAudio(container, audioField) {
+    if (!trim(audioField)) {
+      container.innerHTML = "";
+      return;
+    }
+    container.innerHTML = `<div class="audio-player audio-player-native"><div class="audio-native-label">音频</div><div class="audio-native-body">${audioField}</div></div>`;
+  }
+  function renderTags(tags) {
+    return tags.map((tag) => `<span class="tag-chip">${tag}</span>`).join("");
+  }
+  function sortMasks(masks, order) {
+    return [...masks].sort((left, right) => {
+      if (order === "lr-tb") {
+        return Number(left.x || 0) - Number(right.x || 0) || Number(left.y || 0) - Number(right.y || 0);
       }
-      var noteContainer = document.getElementsByClassName('notes-container')[0]
-      noteContainer.style.maxHeight = left + 'px'
-      noteContainer.style.display = 'block'
-      document.getElementsByClassName('notes-button-container')[0].style.display = 'none'
-    }
+      return Number(left.y || 0) - Number(right.y || 0) || Number(left.x || 0) - Number(right.x || 0);
+    });
   }
 
-  function showNoteButton() {
-    if (document.getElementsByClassName('notes-container')[0].innerHTML) {
-      document.getElementsByClassName('notes-button-container')[0].style.display = 'block'
-      document.getElementById('notes-wrapper').style.display = 'block'
+  // src/back.ts
+  var card = normalizeCard(readFields());
+  var settings = loadSettings();
+  var selectedList = splitItems(loadSessionState(STORAGE_KEYS.selectedPrefix, card.id, ""));
+  var fillDraft = parseDraft(loadSessionState(STORAGE_KEYS.fillPrefix, card.id, "{}"));
+  var visibleMasks = listToFlagMap(splitItems(loadSessionState(STORAGE_KEYS.occlusionPrefix, card.id, "")));
+  var optionOrder = splitItems(loadSessionState(STORAGE_KEYS.orderPrefix, card.id, ""));
+  function parseDraft(raw) {
+    try {
+      return raw ? JSON.parse(raw) : {};
+    } catch (e) {
+      return {};
     }
   }
-
-  function prepareNotes() {
-    document.getElementById('notes-wrapper').innerHTML = '  <hr>\n' +
-      '  <div class="notes-button-container" onclick="showNotes()">\n' +
-      '    <a href="javascript:showNotes();">显示解析</a>\n' +
-      '  </div>\n' +
-      '  <div class="notes-container"></div>'
-    document.getElementsByClassName('notes-container')[0].innerHTML = '{{notes}}'
-    if (Persistence.isAvailable()) {
-      if (Persistence.getItem('ANKI-SETTINGS-HIDE-NOTES') !== '1') {
-        showNotes()
-      } else {
-        showNoteButton()
+  function renderHeader() {
+    byId("card-id").textContent = `#${card.id}`;
+    byId("card-type").textContent = settings.showType ? card.label : "";
+    byId("deck-name").textContent = settings.showDeck ? card.deck : "";
+    byId("tag-bar").innerHTML = renderTags(card.tags);
+  }
+  function renderPrompt() {
+    byId("prompt").innerHTML = card.kind === "fill" ? renderCloze(card.question, "back") : normalizeMathHtml(card.question);
+  }
+  function letters(keys) {
+    return keys.map((key) => Number.parseInt(key, 10)).filter((value) => !Number.isNaN(value)).map((value) => String.fromCharCode(64 + value)).join(", ");
+  }
+  function getChoiceOrder() {
+    const items = card.options.map((label, index) => ({ key: String(index + 1), label }));
+    if (optionOrder.length !== items.length) {
+      return items;
+    }
+    const arranged = optionOrder.map((key) => items.find((item) => item.key === key)).filter((item) => Boolean(item));
+    return arranged.length === items.length ? arranged : items;
+  }
+  function renderChoice() {
+    const selected = listToFlagMap(selectedList);
+    const answers = listToFlagMap(card.answers);
+    let hits = 0;
+    const html = getChoiceOrder().map((option, index) => {
+      let status = "未作答";
+      let extraClass = "";
+      const isSelected = Boolean(selected[option.key]);
+      const isCorrect = Boolean(answers[option.key]);
+      if (isCorrect && isSelected) {
+        extraClass = " is-correct";
+        status = "答对";
+        hits += 1;
+      } else if (isCorrect) {
+        extraClass = " is-missed";
+        status = "正确但未选";
+      } else if (isSelected) {
+        extraClass = " is-wrong";
+        status = "误选";
       }
-    } else {
-      showNotes()
+      return `<div class="option-card result-card${extraClass}"><span class="option-index">${String.fromCharCode(65 + index)}</span><span class="option-label">${normalizeMathHtml(option.label)}</span><span class="option-result">${status}</span></div>`;
+    }).join("");
+    byId("back-interaction").innerHTML = `<div class="option-list">${html}</div>`;
+    byId("answer-summary").textContent = settings.choiceStats ? `正确答案：${letters(card.answers) || "未作答"} · 你的作答：${letters(selectedList) || "未作答"} · 命中：${hits}/${card.answers.length || 1}` : `正确答案：${letters(card.answers) || "未作答"}`;
+  }
+  function renderFill() {
+    const rows = collectClozeTokens(card.question).map((token, index) => {
+      const value = fillDraft[String(index + 1)] || "";
+      const matched = trim(value) === trim(token.answer);
+      return `<div class="result-row"><span class="result-index">空${index + 1}</span><span class="result-user ${matched ? "is-correct" : "is-wrong"}">${value || "未填写"}</span><span class="result-answer">正确答案：${token.answer}</span></div>`;
+    }).join("");
+    byId("back-interaction").innerHTML = `<div class="result-list">${rows}</div>`;
+    byId("answer-summary").textContent = "填空答案已回显";
+  }
+  function getOcclusionMasks() {
+    const masks = Array.isArray(card.extra.masks) ? card.extra.masks : [];
+    return sortMasks(masks, settings.occlusionOrder);
+  }
+  function renderOcclusion() {
+    const masks = getOcclusionMasks();
+    if (!trim(card.occlusionImage) || !masks.length) {
+      byId("back-interaction").innerHTML = '<div class="info-card">图片遮挡数据无效，无法展示背面结果。</div>';
+      byId("answer-summary").textContent = "遮挡数据无效";
+      return;
     }
+    const maskHtml = masks.map((mask, index) => {
+      const id = String(mask.id || index + 1);
+      const revealed = visibleMasks[id] ? " is-revealed" : "";
+      return `<div class="occlusion-mask is-answer${revealed}" style="left:${Number(mask.x || 0)}%;top:${Number(mask.y || 0)}%;width:${Number(mask.w || 10)}%;height:${Number(mask.h || 10)}%;"><span>${mask.label || ""}</span></div>`;
+    }).join("");
+    byId("back-interaction").innerHTML = `<div class="occlusion-shell"><div class="occlusion-canvas">${card.occlusionImage}${maskHtml}</div></div>`;
+    byId("answer-summary").textContent = "已显示全部遮挡区域";
   }
-
-  function updateBackFooter() {
-    document.getElementById("back-footer").insertAdjacentHTML('beforeend', '，开源地址：<a href="https://github.com/git9527/anki-awesome-select">Github</a> | <a href="https://gitee.com/git9527/anki-awesome-select">Gitee</a>');
+  function renderMindmapNode(node) {
+    const children = Array.isArray(node.children) ? node.children : [];
+    const toggle = children.length ? "▾" : "•";
+    const childHtml = children.length ? `<ul class="mindmap-children">${children.map((child) => renderMindmapNode(child)).join("")}</ul>` : "";
+    return `<li class="mindmap-node"><span class="mindmap-toggle">${toggle}</span><div class="mindmap-label">${renderInlineCloze(String(node.text || ""), "back")}</div>${childHtml}</li>`;
   }
-
-  showTags()
-  showAnswers()
-  prepareNotes()
-  updateBackFooter()
-
+  function renderMindmap() {
+    const tree = Array.isArray(card.extra.mindmap) ? card.extra.mindmap : [];
+    byId("back-interaction").innerHTML = `<ul class="mindmap-root">${tree.map((node) => renderMindmapNode(node)).join("")}</ul>`;
+    byId("answer-summary").textContent = "思维导图已展开";
+  }
+  function renderNotes() {
+    const panel = byId("notes-panel");
+    if (!trim(card.notes)) {
+      panel.className = "notes-panel hidden";
+      panel.innerHTML = "";
+      return;
+    }
+    panel.className = "notes-panel";
+    panel.innerHTML = `<div class="notes-title">解析 / 笔记</div><div class="notes-content">${normalizeMathHtml(card.notes)}</div>`;
+  }
+  function renderInteraction() {
+    if (card.kind === "choice") {
+      renderChoice();
+      return;
+    }
+    if (card.kind === "fill") {
+      renderFill();
+      return;
+    }
+    if (card.kind === "occlusion") {
+      renderOcclusion();
+      return;
+    }
+    if (card.kind === "mindmap") {
+      renderMindmap();
+      return;
+    }
+    byId("back-interaction").innerHTML = `<div class="info-card">答案：${card.answers.join(" / ") || "请结合解析阅读"}</div>`;
+    byId("answer-summary").textContent = card.answers.join(" / ") || "已翻到背面";
+  }
+  function main() {
+    setTheme(settings.theme);
+    renderHeader();
+    renderPrompt();
+    renderInteraction();
+    renderNotes();
+    mountAudio(byId("audio-panel"), card.audio);
+    clearReviewState(card.id);
+    queueMathTypeset(["prompt", "back-interaction", "notes-panel"]);
+  }
+  main();
+})();
+</script>
+<script>
+(function () {
+  var probe = document.getElementById("anki-startup-probe");
+  if (probe) {
+    probe.style.background = "#e9fff0";
+    probe.style.borderColor = "#86d39d";
+    probe.style.color = "#176b2c";
+    probe.textContent = "probe: main script finished";
+  }
+})();
 </script>
