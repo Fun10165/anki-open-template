@@ -5,4 +5,6 @@ node_modules/
 .venv/
 .uv-cache/
 .npm-cache/
+__pycache__/
+*.pyc
 *.apkg
