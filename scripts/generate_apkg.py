@@ -1,4 +1,5 @@
 from __future__ import annotations
+from collections.abc import Callable, Iterable
 
 import math
 import wave
@@ -43,7 +44,30 @@ def load_text(path: Path) -> str:
     return path.read_text(encoding="utf-8")
 
 
+def ensure_generated_templates_current() -> None:
+    build_script = ROOT / "scripts" / "build_templates.mjs"
+    pairs = [
+        (
+            ROOT / "front.html",
+            [build_script, ROOT / "src" / "front.ts", ROOT / "src" / "shared.ts", ROOT / "templates" / "front.template.html"],
+        ),
+        (
+            ROOT / "back.html",
+            [build_script, ROOT / "src" / "back.ts", ROOT / "src" / "shared.ts", ROOT / "templates" / "back.template.html"],
+        ),
+    ]
+    stale_outputs = []
+    for output_path, source_paths in pairs:
+        output_mtime = output_path.stat().st_mtime
+        if any(source_path.stat().st_mtime > output_mtime for source_path in source_paths):
+            stale_outputs.append(output_path.name)
+    if stale_outputs:
+        names = ", ".join(stale_outputs)
+        raise RuntimeError(f"Generated template(s) stale: {names}. Run `npm run build` before exporting APKG files.")
+
+
 def build_model() -> genanki.Model:
+    ensure_generated_templates_current()
     return genanki.Model(
         MODEL_ID,
         "Anki Open Template Test Model",
@@ -69,10 +93,115 @@ def build_model() -> genanki.Model:
     )
 
 
+ALLOWED_FIELD_HTML_TAGS = frozenset(
+    {"br", "img", "b", "i", "code", "pre", "ul", "li", "table", "div", "span"}
+)
+NOTE_FIELD_COUNT = 9
+EXTRA_FIELD_INDEX = 6
+
+
+def _html_tag_end(text: str, start: int) -> int:
+    quote = ""
+    for index in range(start + 1, len(text)):
+        char = text[index]
+        if quote:
+            if char == quote:
+                quote = ""
+            continue
+        if char == '"' or char == "'":
+            quote = char
+            continue
+        if char == ">":
+            return index
+    return -1
+
+
+def _allowed_html_tag_end(text: str, start: int) -> int:
+    index = start + 1
+    if index < len(text) and text[index] == "/":
+        index += 1
+
+    name_start = index
+    while index < len(text) and text[index].isalpha():
+        index += 1
+
+    if index == name_start:
+        return -1
+    if text[name_start:index].lower() not in ALLOWED_FIELD_HTML_TAGS:
+        return -1
+    if index < len(text) and text[index] not in " \t\n\r/>":
+        return -1
+    return _html_tag_end(text, start)
+
+
+def escape_literal_angle_brackets(value: str) -> str:
+    escaped_parts: list[str] = []
+    last_index = 0
+    index = 0
+    while index < len(value):
+        if value[index] != "<":
+            index += 1
+            continue
+
+        tag_end = _allowed_html_tag_end(value, index)
+        if tag_end != -1:
+            index = tag_end + 1
+            continue
+
+        escaped_parts.append(value[last_index:index])
+        escaped_parts.append("&lt;")
+        index += 1
+        last_index = index
+
+    if not escaped_parts:
+        return value
+    escaped_parts.append(value[last_index:])
+    return "".join(escaped_parts)
+
+
+def escape_note_fields(fields: list[str]) -> list[str]:
+    escaped_fields = list(fields)
+    while len(escaped_fields) < NOTE_FIELD_COUNT:
+        escaped_fields.append("")
+
+    for index, value in enumerate(escaped_fields):
+        if index == EXTRA_FIELD_INDEX:
+            continue
+        escaped_fields[index] = escape_literal_angle_brackets(value)
+    return escaped_fields
+
+
 def note(model: genanki.Model, fields: list[str], tags: list[str] | None = None) -> genanki.Note:
-    while len(fields) < 9:
-        fields.append("")
-    return genanki.Note(model=model, fields=fields, tags=tags or [])
+    return genanki.Note(model=model, fields=escape_note_fields(fields), tags=tags or [])
+
+
+def write_deck(
+    deck_id: int,
+    deck_name: str,
+    output_path: Path,
+    notes_source: Iterable[genanki.Note] | Callable[[genanki.Model], Iterable[genanki.Note]],
+    media_files: Iterable[Path] = (),
+) -> None:
+    model = build_model()
+    notes = notes_source(model) if callable(notes_source) else notes_source
+    deck = genanki.Deck(deck_id, deck_name)
+    seen_card_ids: set[str] = set()
+    card_count = 0
+    for item in notes:
+        card_id = item.fields[0]
+        if card_id in seen_card_ids:
+            raise ValueError(f"Duplicate card id {card_id!r} in deck {deck_name!r}")
+        seen_card_ids.add(card_id)
+        item.guid = genanki.guid_for(str(deck_id), card_id)
+        deck.add_note(item)
+        card_count += 1
+
+    package = genanki.Package(deck)
+    package.media_files = [str(path) for path in media_files]
+    package.write_to_file(str(output_path))
+    print(f"Wrote {output_path}")
+    print(f"Deck: {deck_name}")
+    print(f"Cards: {card_count}")
 
 
 def build_notes(model: genanki.Model) -> list[genanki.Note]:
@@ -349,11 +478,6 @@ def build_notes(model: genanki.Model) -> list[genanki.Note]:
 
 
 def main() -> None:
-    model = build_model()
-    deck = genanki.Deck(DECK_ID, "Anki Open Template :: Manual Test Deck")
-    for item in build_notes(model):
-      deck.add_note(item)
-
     media_files = [
         ensure_test_audio(),
         MEDIA_DIR / "red.png",
@@ -363,11 +487,13 @@ def main() -> None:
         MEDIA_DIR / "2-windows-single.png",
         MEDIA_DIR / "3-ubuntu-single.png",
     ]
-
-    package = genanki.Package(deck)
-    package.media_files = [str(path) for path in media_files]
-    package.write_to_file(str(OUTPUT))
-    print(f"Wrote {OUTPUT}")
+    write_deck(
+        DECK_ID,
+        "Anki Open Template :: Manual Test Deck",
+        OUTPUT,
+        build_notes,
+        media_files,
+    )
 
 
 if __name__ == "__main__":

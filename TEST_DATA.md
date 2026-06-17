@@ -10,6 +10,9 @@
 - `notes`
 - `extra`
 - `audio`
+- `occlusion_image`
+
+字段约定：choice 的 `answer` 使用从 1 开始的选项序号；`extra` 默认必须是严格 JSON（`R03` 专门测试非法 JSON 降级）；遮挡卡的 `occlusion_image` 放实际渲染的 `<img>` HTML，`extra.image` 放文件名或逻辑图片 id，`extra.masks` 放遮挡块。
 
 建议先建立一个专用测试笔记类型，再新建以下测试卡。每张卡建完以后，按“测试目标”和“预期结果”执行。
 
@@ -35,6 +38,7 @@ answer: 1
 notes: 北京是中国首都。此卡用于验证单选、自动翻面、答案回填、解析显示。
 extra:
 audio:
+occlusion_image:
 ```
 
 **测试目标**
@@ -64,6 +68,7 @@ answer: 1||3||5
 notes: Python、Rust、Go 都是编程语言。本卡用于测试多选、统计、漏选、误选。
 extra:
 audio:
+occlusion_image:
 ```
 
 **测试目标**
@@ -92,6 +97,7 @@ answer: 建立可靠连接并确认双方的发送与接收能力。
 notes: 三次握手的核心是同步双方的初始序列号，并确认收发链路可用。本卡用于测试问答题正反面展示与解析编辑。
 extra:
 audio:
+occlusion_image:
 ```
 
 **测试目标**
@@ -120,6 +126,7 @@ answer: 80
 notes: 用于测试单空输入、Enter 提交、背面回显。
 extra:
 audio:
+occlusion_image:
 ```
 
 **测试目标**
@@ -147,6 +154,7 @@ answer: useState||useEffect||useRef
 notes: 用于测试多空输入、长文本、状态持久化和逐项回显。
 extra:
 audio:
+occlusion_image:
 ```
 
 **测试目标**
@@ -174,6 +182,7 @@ answer:
 notes: 用于测试图片遮挡的点击显隐、显示下一个挖空、切换全部遮挡。
 extra: {"image":"images/red.png","masks":[{"id":"1","x":10,"y":10,"w":25,"h":30,"label":"区域1"},{"id":"2","x":55,"y":45,"w":25,"h":30,"label":"区域2"}]}
 audio:
+occlusion_image: <img src="images/red.png">
 ```
 
 **测试目标**
@@ -201,6 +210,7 @@ answer:
 notes: 用于测试思维导图节点渲染、折叠展开、移动端布局。
 extra: {"mindmap":[{"text":"计算机网络","children":[{"text":"分层模型"},{"text":"TCP/IP"},{"text":"HTTP"}]}]}
 audio:
+occlusion_image:
 ```
 
 **测试目标**
@@ -226,6 +236,7 @@ answer:
 notes: 用于测试播放、暂停、倍速切换。若没有真实音频文件，可先替换成你现有媒体目录里的任意 mp3。
 extra:
 audio: [sound:test.mp3]
+occlusion_image:
 ```
 
 **测试目标**
@@ -254,6 +265,7 @@ answer: 2
 notes: 第一段：用于测试行内公式和块级公式。<br><br>第二段：这里加入较长解析文本，用于测试前面解析区域的滚动行为。你可以继续复制这一段多次，让内容足够长，以观察滚动是否稳定。<br><br>第三段：测试图片在解析中的缩放行为。<br><img src="screens/2-windows-single.png">
 extra:
 audio:
+occlusion_image:
 ```
 
 **测试目标**
@@ -281,6 +293,7 @@ answer: 这是模板字段示意图。
 notes: <b>粗体测试</b><br><i>斜体测试</i><br><br><img src="screens/settings.png"><br>用于测试问答题中图片和 HTML 的显示。
 extra:
 audio:
+occlusion_image:
 ```
 
 **测试目标**
@@ -306,6 +319,7 @@ answer: E||c||m
 notes: 用于测试公式环境中多个填空、英文提示、中英混排。
 extra:
 audio:
+occlusion_image:
 ```
 
 **测试目标**
@@ -330,6 +344,7 @@ answer:
 notes: 先把显示顺序设为“先上下后左右”，测一遍；再改成“先左右后上下”，重测。
 extra: {"image":"screens/3-ubuntu-single.png","masks":[{"id":"1","x":8,"y":10,"w":12,"h":10,"label":"A"},{"id":"2","x":60,"y":12,"w":12,"h":10,"label":"B"},{"id":"3","x":12,"y":45,"w":12,"h":10,"label":"C"},{"id":"4","x":62,"y":50,"w":12,"h":10,"label":"D"}]}
 audio:
+occlusion_image: <img src="screens/3-ubuntu-single.png">
 ```
 
 **测试目标**
@@ -353,6 +368,7 @@ answer:
 notes: 用于测试导图节点内的挖空展示和背面答案。
 extra: {"mindmap":[{"text":"前端","children":[{"text":"框架：{{c1::React}}"},{"text":"样式：CSS"},{"text":"构建：Vite","children":[{"text":"插件系统"},{"text":"热更新"}]}]}]}
 audio:
+occlusion_image:
 ```
 
 **测试目标**
@@ -380,6 +396,7 @@ answer: 特殊字符不应让模板崩溃。
 notes: 解析里也加入相同字符：&lt;tag&gt; "double" 'single' {json}
 extra:
 audio:
+occlusion_image:
 ```
 
 **测试目标**
@@ -403,6 +420,7 @@ answer: 无解析时不应显示空白解析壳。
 notes:
 extra:
 audio:
+occlusion_image:
 ```
 
 **测试目标**
@@ -426,6 +444,7 @@ answer:
 notes: 用于测试 extra 非法时模板的降级能力。
 extra: {"image":"broken.png","masks":[}
 audio:
+occlusion_image:
 ```
 
 **测试目标**
@@ -450,6 +469,7 @@ answer: 标签应换行显示。
 notes: 给这张卡手工添加至少 8 个 tag。
 extra:
 audio:
+occlusion_image:
 ```
 
 **测试目标**
@@ -473,6 +493,7 @@ answer: 4
 notes: 开启随机顺序后，正面与背面的选项顺序必须完全一致。
 extra:
 audio:
+occlusion_image:
 ```
 
 **测试目标**
@@ -497,6 +518,7 @@ answer: alpha||beta
 notes: 本卡用于和 F02、O01 交叉测试状态隔离。
 extra:
 audio:
+occlusion_image:
 ```
 
 **测试目标**

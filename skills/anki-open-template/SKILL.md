@@ -22,6 +22,7 @@ npm run build
 ```bash
 ./.venv/bin/python scripts/generate_apkg.py
 ```
+5. For any field-contract change, update runtime parsing/templates, APKG generation data, README, TEST_DATA.md, and both skills together before validating.
 
 ## Repository Map
 
@@ -37,10 +38,13 @@ npm run build
 ## Guardrails
 
 - Do not hand-maintain large logic in generated `front.html` or `back.html`; regenerate them.
-- Preserve field-driven occlusion rendering via `occlusion_image`.
+- Preserve the 9-field contract: `id`, `type`, `question`, `options`, `answer`, `notes`, strict JSON `extra`, `audio`, and `occlusion_image`.
+- For field-contract changes, update runtime parsing, templates, APKG generation, README, TEST_DATA.md, and skill docs together.
+- Preserve occlusion's split: `occlusion_image` is rendered `<img>` HTML, while `extra.image` is the filename/logical image id and `extra.masks` defines masks.
 - Keep session answer state isolated per card and clear it on the back side.
 - Be conservative with Anki compatibility: avoid browser APIs that are likely to fail in embedded webviews.
 - When debugging rendering failures, inspect generated inline script output first, not just TypeScript source.
+- When adding repository cards, keep script data and manual docs in sync; avoid runtime/build edits unless behavior changes.
 
 ## Validation
 
@@ -51,6 +55,8 @@ npm run typecheck
 npm run lint
 npm run build
 ```
+
+For field-contract changes, explicitly cross-check README, TEST_DATA.md, `scripts/generate_apkg.py`, and both skill documents before exporting.
 
 If behavior changed, also export the APKG and verify at least:
 

@@ -54,6 +54,12 @@ This performs:
 
 ## Export Test Deck
 
+Install Python packaging dependencies in the project virtualenv first:
+
+```bash
+./.venv/bin/pip install -r requirements.txt
+```
+
 Generate a ready-to-import APKG:
 
 ```bash

@@ -1,10 +1,8 @@
 from __future__ import annotations
 
-from pathlib import Path
-
 import genanki
 
-from generate_apkg import ROOT, build_model, note
+from generate_apkg import ROOT, note, write_deck
 
 
 OUTPUT = ROOT / "anki-open-template-automata-theory.apkg"
@@ -339,15 +337,7 @@ def build_notes(model: genanki.Model) -> list[genanki.Note]:
 
 
 def main() -> None:
-    model = build_model()
-    deck = genanki.Deck(DECK_ID, "Anki Open Template :: Automata Theory")
-    for item in build_notes(model):
-        deck.add_note(item)
-
-    package = genanki.Package(deck)
-    package.media_files = []
-    package.write_to_file(str(OUTPUT))
-    print(f"Wrote {OUTPUT}")
+    write_deck(DECK_ID, "Anki Open Template :: Automata Theory", OUTPUT, build_notes)
 
 
 if __name__ == "__main__":

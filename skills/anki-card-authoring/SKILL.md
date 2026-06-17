@@ -32,7 +32,7 @@ Output shape:
 
 - `type`: `choice`
 - `options`: join with `||`
-- `answer`: `1` or `1||3||5`
+- `answer`: 1-based option index or indices, such as `1` or `1||3||5`
 
 ### QA
 
@@ -79,8 +79,8 @@ Required content:
 Output shape:
 
 - `type`: `occlusion`
-- `occlusion_image`: image HTML
-- `extra`: JSON with `image` and `masks`
+- `occlusion_image`: rendered `<img>` HTML shown by the template
+- `extra`: strict JSON with logical `image` filename/id and `masks` rectangles
 
 ### Mindmap
 
@@ -93,7 +93,7 @@ Required content:
 Output shape:
 
 - `type`: `mindmap`
-- `extra`: JSON with `mindmap`
+- `extra`: strict JSON with `mindmap`
 
 ### Audio
 
@@ -109,9 +109,13 @@ Output shape:
 - Prefer one clear learning objective per card.
 - Keep the prompt shorter than the explanation.
 - Put supporting explanation in `notes`, not `question`.
+- When mathematical notation is involved, prefer LaTeX wrapped in `$...$` or `$$...$$` instead of raw Unicode symbols.
+- Do not write bare special Unicode characters such as `Σ`, `Γ`, `ε`, `∈`, `⊆`, `⋃`, `^*`-style pseudo notation when a clean LaTeX form like `$\Sigma$`, `$\epsilon$`, `$x \in A$`, `$L \subseteq \Sigma^*$`, or `$$A^* = \bigcup_{n \ge 0} A^n$$` is available.
+- Prefer visually standard mathematical forms because they are easier to read, easier to memorize, and render more consistently across cards.
 - For choice cards, avoid ambiguous distractors.
 - For fill cards, only cloze the part that should be recalled.
 - For multi-answer choice cards, ensure the question wording says multiple answers may be correct.
+- For choice answers, count options from 1, not 0.
 - For occlusion cards, keep masks large enough to tap on mobile.
 - For mindmaps, keep each node label short.
 
@@ -151,7 +155,7 @@ If a field is unused, leave it empty.
   - `fill` for exact recall
   - `qa` for short explanation
 - If the user asks for a batch, keep card difficulty mixed but consistent.
-- If the user asks to add cards into this repository, update the existing test deck or card source in the most direct place already used by the project.
+- If the user asks to add cards into this repository, update the existing script data and manual card docs together; do not touch runtime, template, or build files unless the card behavior itself changes.
 
 ## What Not To Do
 
@@ -159,3 +163,5 @@ If a field is unused, leave it empty.
 - Do not expose runtime storage keys, generated HTML structure, or build internals.
 - Do not overuse cloze for content better expressed as choice or QA.
 - Do not create cards whose answer cannot be judged clearly.
+- Do not default to raw Unicode math symbols when LaTeX notation would express the same content more cleanly.
+- Do not change the 9-field contract in card examples without checking README, TEST_DATA.md, and the template-maintenance skill.

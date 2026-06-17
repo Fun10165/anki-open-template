@@ -1,4 +1,4 @@
 version: 1
 display_name: Anki Open Template
 short_description: Maintain a TS-driven Anki template bundle and APKG test deck.
-default_prompt: Maintain, debug, and extend this repository's generated Anki card templates without regressing cross-client behavior.
+default_prompt: Maintain, debug, and extend generated Anki card templates around the 9-field contract (`id`, `type`, `question`, `options`, `answer`, `notes`, strict JSON `extra`, `audio`, `occlusion_image`); rebuild generated templates/APKG only when source, template, field contract, media, or test data changes and validate the affected card behaviors without hand-editing generated HTML.
