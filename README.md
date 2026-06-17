@@ -142,9 +142,9 @@ Recommended order:
 3. Occlusion and mindmap
 4. Edge and regression cases
 
-## Codex Skill
+## Skills
 
-This repository ships reusable Codex skills in:
+This repository ships reusable skills in:
 
 - `skills/anki-open-template/`
 - `skills/anki-card-authoring/`

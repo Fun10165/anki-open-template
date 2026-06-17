@@ -2,7 +2,7 @@
 
 ## OVERVIEW
 
-`skills/` contains Codex-facing workflows shipped with the Anki template project. It is not runtime code; it defines when agents should maintain the template versus author cards.
+`skills/` contains agent-facing workflows shipped with the Anki template project. It is not runtime code; it defines when agents should maintain the template versus author cards.
 
 ## STRUCTURE
 

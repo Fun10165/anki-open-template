@@ -113,6 +113,7 @@ Output shape:
 - Do not write bare special Unicode characters such as `Σ`, `Γ`, `ε`, `∈`, `⊆`, `⋃`, `^*`-style pseudo notation when a clean LaTeX form like `$\Sigma$`, `$\epsilon$`, `$x \in A$`, `$L \subseteq \Sigma^*$`, or `$$A^* = \bigcup_{n \ge 0} A^n$$` is available.
 - Prefer visually standard mathematical forms because they are easier to read, easier to memorize, and render more consistently across cards.
 - For choice cards, avoid ambiguous distractors.
+- For choice cards, make wrong options plausible rather than obviously false, and avoid surface cues a learner can overfit, such as the correct option being much longer than every distractor.
 - For fill cards, only cloze the part that should be recalled.
 - For multi-answer choice cards, ensure the question wording says multiple answers may be correct.
 - For choice answers, count options from 1, not 0.
