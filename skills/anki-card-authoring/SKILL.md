@@ -47,7 +47,7 @@ Output shape:
 
 - `type`: `qa`
 - `options`: empty
-- `answer`: plain text
+- `answer`: plain text; literal angle brackets such as `std::vector<int>` must remain text, not HTML
 
 ### Fill
 
@@ -63,6 +63,7 @@ Output shape:
 
 - `type`: `fill`
 - write cloze inline as `{{c1::answer::hint}}`
+- escape `::` inside the answer as `\::`, for example `{{c1::String\::new()}}`; keep `answer` as the unescaped canonical value `String::new()`
 - leave `options` empty
 - put canonical answers in `answer`, joined by `||`
 
@@ -80,7 +81,7 @@ Output shape:
 
 - `type`: `occlusion`
 - `occlusion_image`: rendered `<img>` HTML shown by the template
-- `extra`: strict JSON with logical `image` filename/id and `masks` rectangles
+- `extra`: strict JSON with logical `image` filename/id and `masks` rectangles; labels are plain text, not HTML
 
 ### Mindmap
 
@@ -93,7 +94,7 @@ Required content:
 Output shape:
 
 - `type`: `mindmap`
-- `extra`: strict JSON with `mindmap`
+- `extra`: strict JSON with `mindmap`; every node `text` is plain text, not HTML
 
 ### Audio
 
@@ -107,6 +108,9 @@ Output shape:
 ## Minimal Authoring Rules
 
 - Prefer one clear learning objective per card.
+- Use the user's explicitly preferred language; otherwise follow the language used by the user or source. For Chinese users or source material, write concise, natural Chinese instead of unnecessary English labels, boilerplate, or verbose translated prose.
+- Preserve canonical technical English, code, and symbols. Introduce an English term once in parentheses only when it improves precision or future recognition; do not make every term bilingual.
+- Optimize learner-visible text for fast mobile review: keep fronts, answers, and notes compact, and avoid needless line breaks, stacked fragments, or layout-driven repetition.
 - Keep the prompt shorter than the explanation.
 - Put supporting explanation in `notes`, not `question`.
 - When mathematical notation is involved, prefer LaTeX wrapped in `$...$` or `$$...$$` instead of raw Unicode symbols.
@@ -114,7 +118,7 @@ Output shape:
 - Prefer visually standard mathematical forms because they are easier to read, easier to memorize, and render more consistently across cards.
 - For choice cards, avoid ambiguous distractors.
 - For choice cards, make wrong options plausible rather than obviously false, and avoid surface cues a learner can overfit, such as the correct option being much longer than every distractor.
-- For fill cards, only cloze the part that should be recalled.
+- For fill cards, only cloze the part that should be recalled. Escape literal `::` inside an answer as `\::`; unescaped `::` remains the answer/hint separator.
 - For multi-answer choice cards, ensure the question wording says multiple answers may be correct.
 - For choice answers, count options from 1, not 0.
 - For occlusion cards, keep masks large enough to tap on mobile.
@@ -157,6 +161,7 @@ If a field is unused, leave it empty.
   - `qa` for short explanation
 - If the user asks for a batch, keep card difficulty mixed but consistent.
 - If the user asks to add cards into this repository, update the existing script data and manual card docs together; do not touch runtime, template, or build files unless the card behavior itself changes.
+- When editing `scripts/*.py`, pass ordinary card text as `str`. Wrap only intentional rich HTML in `question`, `options`, `notes`, or `occlusion_image` with `trusted_html(...)`, after all concatenation is complete. This wrapper is a Python generator API and is never written into a card field.
 
 ## What Not To Do
 
@@ -166,3 +171,4 @@ If a field is unused, leave it empty.
 - Do not create cards whose answer cannot be judged clearly.
 - Do not default to raw Unicode math symbols when LaTeX notation would express the same content more cleanly.
 - Do not change the 9-field contract in card examples without checking README, TEST_DATA.md, and the template-maintenance skill.
+- Do not mark `answer`, `extra`, mask labels, or mindmap node text as trusted HTML to bypass escaping.

@@ -1,0 +1,4 @@
+version: 1
+display_name: Guided Concept Learning
+short_description: Teach concepts through motivated examples, precise definitions, and audited coverage.
+default_prompt: Determine the learner's relevant knowledge range, then teach the concept through a motivated end-to-end example that moves from intuition to a precise, implementable account; define every potentially unfamiliar concept non-metaphorically, cover assumptions, boundaries, failures, and useful alternatives, and end with a coverage audit. Use the learner's preferred language, inferred from the conversation and source unless explicitly overridden; when that language is Chinese, use concise, fluent Chinese for faster reading without unnecessary English headings or boilerplate. Keep formatting readable without excessive line breaks, especially for later mobile review, without omitting strict definitions, equations, traces, limitations, alternatives, or the mandatory coverage audit.

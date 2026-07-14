@@ -12,9 +12,9 @@
 - `audio`
 - `occlusion_image`
 
-字段约定：choice 的 `answer` 使用从 1 开始的选项序号；`extra` 默认必须是严格 JSON（`R03` 专门测试非法 JSON 降级）；遮挡卡的 `occlusion_image` 放实际渲染的 `<img>` HTML，`extra.image` 放文件名或逻辑图片 id，`extra.masks` 放遮挡块。
+字段约定：choice 的 `answer` 使用从 1 开始的选项序号；fill 中未转义的 `::` 分隔答案与提示，答案自身需要双冒号时写成 `\::`（如 `{{c1::String\::new()}}`），对应 `answer` 仍写 `String::new()`；`extra` 默认必须是严格 JSON（`R03` 专门测试非法 JSON 降级）；遮挡卡的 `occlusion_image` 放实际渲染的 `<img>` HTML，`extra.image` 放文件名或逻辑图片 id，`extra.masks` 放遮挡块。
 
-建议先建立一个专用测试笔记类型，再新建以下测试卡。每张卡建完以后，按“测试目标”和“预期结果”执行。
+建议先建立一个专用测试笔记类型，并按 README 的 9 字段顺序配置字段。将根目录 `front.html`、`back.html` 分别安装为正反面模板，将 `styles.css` 安装到笔记类型的样式区；媒体文件以扁平文件名导入 Anki 媒体库。然后再新建以下测试卡，并按“测试目标”和“预期结果”执行。
 
 ## 使用建议
 
@@ -180,9 +180,9 @@ question: 请指出图中的两个重点区域。
 options:
 answer:
 notes: 用于测试图片遮挡的点击显隐、显示下一个挖空、切换全部遮挡。
-extra: {"image":"images/red.png","masks":[{"id":"1","x":10,"y":10,"w":25,"h":30,"label":"区域1"},{"id":"2","x":55,"y":45,"w":25,"h":30,"label":"区域2"}]}
+extra: {"image":"red.png","masks":[{"id":"1","x":10,"y":10,"w":25,"h":30,"label":"区域1"},{"id":"2","x":55,"y":45,"w":25,"h":30,"label":"区域2"}]}
 audio:
-occlusion_image: <img src="images/red.png">
+occlusion_image: <img class="occlusion-image" src="red.png">
 ```
 
 **测试目标**
@@ -235,7 +235,7 @@ options:
 answer:
 notes: 用于测试播放、暂停、倍速切换。若没有真实音频文件，可先替换成你现有媒体目录里的任意 mp3。
 extra:
-audio: [sound:test.mp3]
+audio: [sound:test.wav]
 occlusion_image:
 ```
 
@@ -260,9 +260,9 @@ occlusion_image:
 id: C03
 type: choice
 question: 若行内公式为 $a^2+b^2=c^2$，下列哪一项是块级展示？<br><br>注意测试公式与多段解析。
-options: $x+y$||$$x^2+y^2=z^2$$||普通文本||<img src="screens/1-mac-single.png">
+options: $x+y$||$$x^2+y^2=z^2$$||普通文本||<img src="1-mac-single.png">
 answer: 2
-notes: 第一段：用于测试行内公式和块级公式。<br><br>第二段：这里加入较长解析文本，用于测试前面解析区域的滚动行为。你可以继续复制这一段多次，让内容足够长，以观察滚动是否稳定。<br><br>第三段：测试图片在解析中的缩放行为。<br><img src="screens/2-windows-single.png">
+notes: 第一段：用于测试行内公式和块级公式。<br><br>第二段：这里加入较长解析文本，用于测试前面解析区域的滚动行为。你可以继续复制这一段多次，让内容足够长，以观察滚动是否稳定。<br><br>第三段：测试图片在解析中的缩放行为。<br><img src="2-windows-single.png">
 extra:
 audio:
 occlusion_image:
@@ -287,10 +287,10 @@ occlusion_image:
 ```text
 id: Q02
 type: qa
-question: 下面这张图展示了什么？<br><img src="screens/fields.png">
+question: 下面这张图展示了什么？<br><img src="fields.png">
 options:
 answer: 这是模板字段示意图。
-notes: <b>粗体测试</b><br><i>斜体测试</i><br><br><img src="screens/settings.png"><br>用于测试问答题中图片和 HTML 的显示。
+notes: <b>粗体测试</b><br><i>斜体测试</i><br><br><img src="settings.png"><br>用于测试问答题中图片和 HTML 的显示。
 extra:
 audio:
 occlusion_image:
@@ -342,9 +342,9 @@ question: 用于测试“显示下一个挖空”的顺序。
 options:
 answer:
 notes: 先把显示顺序设为“先上下后左右”，测一遍；再改成“先左右后上下”，重测。
-extra: {"image":"screens/3-ubuntu-single.png","masks":[{"id":"1","x":8,"y":10,"w":12,"h":10,"label":"A"},{"id":"2","x":60,"y":12,"w":12,"h":10,"label":"B"},{"id":"3","x":12,"y":45,"w":12,"h":10,"label":"C"},{"id":"4","x":62,"y":50,"w":12,"h":10,"label":"D"}]}
+extra: {"image":"3-ubuntu-single.png","masks":[{"id":"1","x":8,"y":10,"w":12,"h":10,"label":"A"},{"id":"2","x":60,"y":12,"w":12,"h":10,"label":"B"},{"id":"3","x":12,"y":45,"w":12,"h":10,"label":"C"},{"id":"4","x":62,"y":50,"w":12,"h":10,"label":"D"}]}
 audio:
-occlusion_image: <img src="screens/3-ubuntu-single.png">
+occlusion_image: <img class="occlusion-image" src="3-ubuntu-single.png">
 ```
 
 **测试目标**
@@ -466,7 +466,7 @@ type: qa
 question: 长标签显示测试。
 options:
 answer: 标签应换行显示。
-notes: 给这张卡手工添加至少 8 个 tag。
+notes: 使用随测试 APKG 附带的 tag-01 到 tag-08；若手工建卡，则添加相同 8 个 tag。
 extra:
 audio:
 occlusion_image:
@@ -499,11 +499,18 @@ occlusion_image:
 **测试目标**
 
 - 随机顺序持久化
+- 选择题立即、延迟、手动三种选项显示模式
+- 切换显示模式时取消旧的延迟任务
 
 **预期结果**
 
 - 正面看到的 A/B/C/D/E 对应顺序，在背面必须保持一致。
 - 多次进入同一张卡，直到切换设置前，顺序不应反复跳变。
+- “立即显示”模式进入卡片后直接出现五个选项。
+- “延迟显示”设为 `1000 ms` 后，倒计时期间选项不出现在页面、键盘焦点顺序或辅助技术树中；约 1000 ms 后才出现。
+- “手动显示”模式只出现“显示选项”按钮；点击后显示选项，但不自动选中、不自动翻面。
+- 延迟倒计时期间切到“手动显示”或“立即显示”后，旧倒计时不得再次覆盖当前界面。
+- 延迟时间仅在“延迟显示”模式下可见且可编辑，输入值限制为 `0`–`60000 ms`。
 
 ### R06 状态隔离
 
@@ -530,6 +537,83 @@ occlusion_image:
 - 本卡输入内容不应污染 F02。
 - 本卡切回后，自己的输入仍存在。
 
+### R07 尖括号纯文本
+
+**字段**
+
+```text
+id: R07
+type: qa
+question: What does <div> mean? C++ 类型 std::vector<int> 中的尖括号必须保留。
+options:
+answer: std::vector<int>
+notes: 普通文本中的 <div>、<int> 和 x < y > z 不得被识别成 HTML。
+extra:
+audio:
+occlusion_image:
+```
+
+**测试目标**
+
+- 纯文本尖括号转义
+- QA 答案回显
+
+**预期结果**
+
+- 正反面完整显示所有尖括号内容。
+- 不产生额外 DOM，也不吞掉后续字段。
+
+### R08 代码块美元符号
+
+**字段**
+
+```text
+id: R08
+type: qa
+question: Shell 示例：<code>echo $HOME</code>；价格示例：<code>$5</code>。
+options:
+answer: 代码元素中的美元符号不是数学分隔符。
+notes: 普通文本中的 $x$ 仍应作为行内数学公式处理。
+extra:
+audio:
+occlusion_image:
+```
+
+**测试目标**
+
+- 代码元素与 MathJax 分隔符隔离
+
+**预期结果**
+
+- `<code>` 内原样显示 `$HOME` 和 `$5`。
+- notes 中的 `$x$` 仍可正常公式化。
+
+### R09 JSON 文本注入防护
+
+**字段**
+
+```text
+id: R09
+type: mindmap
+question: extra 中的节点文本必须按纯文本渲染。
+options:
+answer:
+notes: 节点文本不可创建 img 元素或执行事件属性。
+extra: {"mindmap":[{"text":"<img src=x onerror=document.documentElement.dataset.injected=1>"}]}
+audio:
+occlusion_image:
+```
+
+**测试目标**
+
+- JSON 派生文本转义
+- 事件属性注入防护
+
+**预期结果**
+
+- 节点中显示完整 `<img ...>` 文本。
+- DOM 中不出现该图片，`data-injected` 不会被设置。
+
 ## 主路径最小回归集
 
 如果你只想快速确认当前模板可用，至少测这 7 张：
@@ -546,7 +630,7 @@ occlusion_image:
 
 1. 先桌面：`C01 -> C02 -> Q01 -> F01 -> F02 -> O01 -> O02 -> M01 -> A01`
 2. 再桌面复杂内容：`C03 -> Q02 -> F03 -> M02`
-3. 再桌面边界：`R01 -> R02 -> R03 -> R04 -> R05 -> R06`
+3. 再桌面边界：`R01 -> R02 -> R03 -> R04 -> R05 -> R06 -> R07 -> R08 -> R09`
 4. 再到 AnkiDroid 跑“主路径最小回归集”
 5. 再到 AnkiMobile 跑“主路径最小回归集”
 

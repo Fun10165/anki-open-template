@@ -1,6 +1,8 @@
 from __future__ import annotations
 from collections.abc import Callable, Iterable
+from html import escape
 
+import json
 import math
 import wave
 from pathlib import Path
@@ -93,86 +95,68 @@ def build_model() -> genanki.Model:
     )
 
 
-ALLOWED_FIELD_HTML_TAGS = frozenset(
-    {"br", "img", "b", "i", "code", "pre", "ul", "li", "table", "div", "span"}
-)
 NOTE_FIELD_COUNT = 9
 EXTRA_FIELD_INDEX = 6
+RICH_HTML_FIELD_INDEXES = frozenset({2, 3, 5, 8})
 
 
-def _html_tag_end(text: str, start: int) -> int:
-    quote = ""
-    for index in range(start + 1, len(text)):
-        char = text[index]
-        if quote:
-            if char == quote:
-                quote = ""
-            continue
-        if char == '"' or char == "'":
-            quote = char
-            continue
-        if char == ">":
-            return index
-    return -1
+class TrustedHtml(str):
+    """Explicitly marks repository-authored rich HTML for an Anki field."""
 
 
-def _allowed_html_tag_end(text: str, start: int) -> int:
-    index = start + 1
-    if index < len(text) and text[index] == "/":
-        index += 1
-
-    name_start = index
-    while index < len(text) and text[index].isalpha():
-        index += 1
-
-    if index == name_start:
-        return -1
-    if text[name_start:index].lower() not in ALLOWED_FIELD_HTML_TAGS:
-        return -1
-    if index < len(text) and text[index] not in " \t\n\r/>":
-        return -1
-    return _html_tag_end(text, start)
+class InvalidJsonFixture(str):
+    """Explicitly marks the one malformed-extra regression fixture."""
 
 
-def escape_literal_angle_brackets(value: str) -> str:
-    escaped_parts: list[str] = []
-    last_index = 0
-    index = 0
-    while index < len(value):
-        if value[index] != "<":
-            index += 1
-            continue
-
-        tag_end = _allowed_html_tag_end(value, index)
-        if tag_end != -1:
-            index = tag_end + 1
-            continue
-
-        escaped_parts.append(value[last_index:index])
-        escaped_parts.append("&lt;")
-        index += 1
-        last_index = index
-
-    if not escaped_parts:
-        return value
-    escaped_parts.append(value[last_index:])
-    return "".join(escaped_parts)
+def trusted_html(value: str) -> TrustedHtml:
+    return TrustedHtml(value)
 
 
-def escape_note_fields(fields: list[str]) -> list[str]:
-    escaped_fields = list(fields)
-    while len(escaped_fields) < NOTE_FIELD_COUNT:
-        escaped_fields.append("")
-
-    for index, value in enumerate(escaped_fields):
-        if index == EXTRA_FIELD_INDEX:
-            continue
-        escaped_fields[index] = escape_literal_angle_brackets(value)
-    return escaped_fields
+def invalid_json_fixture(value: str) -> InvalidJsonFixture:
+    return InvalidJsonFixture(value)
 
 
-def note(model: genanki.Model, fields: list[str], tags: list[str] | None = None) -> genanki.Note:
-    return genanki.Note(model=model, fields=escape_note_fields(fields), tags=tags or [])
+def prepare_note_fields(fields: list[str | TrustedHtml | InvalidJsonFixture]) -> list[str]:
+    if len(fields) != NOTE_FIELD_COUNT:
+        raise ValueError(f"Expected exactly {NOTE_FIELD_COUNT} note fields, got {len(fields)}")
+    if not str(fields[0]).strip():
+        raise ValueError("Card id must not be empty")
+
+    extra = str(fields[EXTRA_FIELD_INDEX]).strip()
+    extra_field = fields[EXTRA_FIELD_INDEX]
+    if isinstance(extra_field, InvalidJsonFixture):
+        pass
+    elif extra:
+        try:
+            parsed_extra = json.loads(extra)
+        except json.JSONDecodeError as error:
+            raise ValueError("extra must be valid JSON") from error
+        if not isinstance(parsed_extra, dict):
+            raise ValueError("extra must be a JSON object")
+
+    prepared: list[str] = []
+    for index, value in enumerate(fields):
+        if not isinstance(value, str):
+            raise TypeError(f"Field {index + 1} must be a string")
+        if isinstance(value, TrustedHtml):
+            if index not in RICH_HTML_FIELD_INDEXES:
+                raise ValueError(f"Field {index + 1} does not accept trusted HTML")
+            prepared.append(str(value))
+        elif isinstance(value, InvalidJsonFixture):
+            if index != EXTRA_FIELD_INDEX:
+                raise ValueError("InvalidJsonFixture is only valid for the extra field")
+            prepared.append(escape(value, quote=False))
+        else:
+            prepared.append(escape(value, quote=False))
+    return prepared
+
+
+def note(
+    model: genanki.Model,
+    fields: list[str | TrustedHtml | InvalidJsonFixture],
+    tags: list[str] | None = None,
+) -> genanki.Note:
+    return genanki.Note(model=model, fields=prepare_note_fields(fields), tags=tags or [])
 
 
 def write_deck(
@@ -182,6 +166,20 @@ def write_deck(
     notes_source: Iterable[genanki.Note] | Callable[[genanki.Model], Iterable[genanki.Note]],
     media_files: Iterable[Path] = (),
 ) -> None:
+    if not isinstance(deck_id, int) or deck_id <= 0:
+        raise ValueError("deck_id must be a positive integer")
+    if not deck_name.strip():
+        raise ValueError("deck_name must not be empty")
+    if not output_path.parent.is_dir():
+        raise FileNotFoundError(f"Output directory does not exist: {output_path.parent}")
+    media_paths = list(media_files)
+    missing_media = [path for path in media_paths if not path.is_file()]
+    if missing_media:
+        raise FileNotFoundError(f"Missing media file(s): {', '.join(str(path) for path in missing_media)}")
+    media_names = [path.name for path in media_paths]
+    if len(media_names) != len(set(media_names)):
+        raise ValueError("Media filenames must be unique because Anki stores media in a flat namespace")
+
     model = build_model()
     notes = notes_source(model) if callable(notes_source) else notes_source
     deck = genanki.Deck(deck_id, deck_name)
@@ -197,7 +195,7 @@ def write_deck(
         card_count += 1
 
     package = genanki.Package(deck)
-    package.media_files = [str(path) for path in media_files]
+    package.media_files = [str(path) for path in media_paths]
     package.write_to_file(str(output_path))
     print(f"Wrote {output_path}")
     print(f"Deck: {deck_name}")
@@ -217,6 +215,7 @@ def build_notes(model: genanki.Model) -> list[genanki.Note]:
                 "北京是中国首都。此卡用于验证单选、自动翻面、答案回填、解析显示。",
                 "",
                 "",
+                "",
             ],
             ["base", "choice", "single"],
         ),
@@ -229,6 +228,7 @@ def build_notes(model: genanki.Model) -> list[genanki.Note]:
                 "Python||Banana||Rust||Notebook||Go",
                 "1||3||5",
                 "Python、Rust、Go 都是编程语言。本卡用于测试多选、统计、漏选、误选。",
+                "",
                 "",
                 "",
             ],
@@ -245,6 +245,7 @@ def build_notes(model: genanki.Model) -> list[genanki.Note]:
                 "三次握手的核心是同步双方的初始序列号，并确认收发链路可用。本卡用于测试问答题正反面展示与解析编辑。",
                 "",
                 "",
+                "",
             ],
             ["base", "qa"],
         ),
@@ -257,6 +258,7 @@ def build_notes(model: genanki.Model) -> list[genanki.Note]:
                 "",
                 "80",
                 "用于测试单空输入、Enter 提交、背面回显。",
+                "",
                 "",
                 "",
             ],
@@ -273,6 +275,7 @@ def build_notes(model: genanki.Model) -> list[genanki.Note]:
                 "用于测试多空输入、长文本、状态持久化和逐项回显。",
                 "",
                 "",
+                "",
             ],
             ["base", "fill", "multi-cloze"],
         ),
@@ -287,7 +290,7 @@ def build_notes(model: genanki.Model) -> list[genanki.Note]:
                 "用于测试图片遮挡的点击显隐、显示下一个挖空、切换全部遮挡。",
                 '{"image":"red.png","masks":[{"id":"1","x":10,"y":10,"w":25,"h":30,"label":"区域1"},{"id":"2","x":55,"y":45,"w":25,"h":30,"label":"区域2"}]}',
                 "",
-                '<img class="occlusion-image" src="red.png">',
+                trusted_html('<img class="occlusion-image" src="red.png">'),
             ],
             ["base", "occlusion"],
         ),
@@ -301,6 +304,7 @@ def build_notes(model: genanki.Model) -> list[genanki.Note]:
                 "",
                 "用于测试思维导图节点渲染、折叠展开、移动端布局。",
                 '{"mindmap":[{"text":"计算机网络","children":[{"text":"分层模型"},{"text":"TCP/IP"},{"text":"HTTP"}]}]}',
+                "",
                 "",
             ],
             ["base", "mindmap"],
@@ -316,6 +320,7 @@ def build_notes(model: genanki.Model) -> list[genanki.Note]:
                 "用于测试播放、暂停、倍速切换。",
                 "",
                 "[sound:test.wav]",
+                "",
             ],
             ["base", "audio"],
         ),
@@ -324,10 +329,11 @@ def build_notes(model: genanki.Model) -> list[genanki.Note]:
             [
                 "C03",
                 "choice",
-                '若行内公式为 $a^2+b^2=c^2$，下列哪一项是块级展示？<br><br>注意测试公式与多段解析。',
-                '$x+y$||$$x^2+y^2=z^2$$||普通文本||<img src="1-mac-single.png">',
+                trusted_html('若行内公式为 $a^2+b^2=c^2$，下列哪一项是块级展示？<br><br>注意测试公式与多段解析。'),
+                trusted_html('$x+y$||$$x^2+y^2=z^2$$||普通文本||<img src="1-mac-single.png">'),
                 "2",
-                '第一段：用于测试行内公式和块级公式。<br><br>第二段：这里加入较长解析文本，用于测试前面解析区域的滚动行为。你可以继续复制这一段多次，让内容足够长，以观察滚动是否稳定。<br><br>第三段：测试图片在解析中的缩放行为。<br><img src="2-windows-single.png">',
+                trusted_html('第一段：用于测试行内公式和块级公式。<br><br>第二段：这里加入较长解析文本，用于测试前面解析区域的滚动行为。你可以继续复制这一段多次，让内容足够长，以观察滚动是否稳定。<br><br>第三段：测试图片在解析中的缩放行为。<br><img src="2-windows-single.png">'),
+                "",
                 "",
                 "",
             ],
@@ -338,10 +344,11 @@ def build_notes(model: genanki.Model) -> list[genanki.Note]:
             [
                 "Q02",
                 "qa",
-                '下面这张图展示了什么？<br><img src="fields.png">',
+                trusted_html('下面这张图展示了什么？<br><img src="fields.png">'),
                 "",
                 "这是模板字段示意图。",
-                '<b>粗体测试</b><br><i>斜体测试</i><br><br><img src="settings.png"><br>用于测试问答题中图片和 HTML 的显示。',
+                trusted_html('<b>粗体测试</b><br><i>斜体测试</i><br><br><img src="settings.png"><br>用于测试问答题中图片和 HTML 的显示。'),
+                "",
                 "",
                 "",
             ],
@@ -358,6 +365,7 @@ def build_notes(model: genanki.Model) -> list[genanki.Note]:
                 "用于测试公式环境中多个填空、英文提示、中英混排。",
                 "",
                 "",
+                "",
             ],
             ["complex", "fill", "math"],
         ),
@@ -372,7 +380,7 @@ def build_notes(model: genanki.Model) -> list[genanki.Note]:
                 "先把显示顺序设为“先上下后左右”，测一遍；再改成“先左右后上下”，重测。",
                 '{"image":"3-ubuntu-single.png","masks":[{"id":"1","x":8,"y":10,"w":12,"h":10,"label":"A"},{"id":"2","x":60,"y":12,"w":12,"h":10,"label":"B"},{"id":"3","x":12,"y":45,"w":12,"h":10,"label":"C"},{"id":"4","x":62,"y":50,"w":12,"h":10,"label":"D"}]}',
                 "",
-                '<img class="occlusion-image" src="3-ubuntu-single.png">',
+                trusted_html('<img class="occlusion-image" src="3-ubuntu-single.png">'),
             ],
             ["complex", "occlusion", "order"],
         ),
@@ -387,6 +395,7 @@ def build_notes(model: genanki.Model) -> list[genanki.Note]:
                 "用于测试导图节点内的挖空展示和背面答案。",
                 '{"mindmap":[{"text":"前端","children":[{"text":"框架：{{c1::React}}"},{"text":"样式：CSS"},{"text":"构建：Vite","children":[{"text":"插件系统"},{"text":"热更新"}]}]}]}',
                 "",
+                "",
             ],
             ["complex", "mindmap", "cloze"],
         ),
@@ -399,6 +408,7 @@ def build_notes(model: genanki.Model) -> list[genanki.Note]:
                 "",
                 "特殊字符不应让模板崩溃。",
                 '解析里也加入相同字符：&lt;tag&gt; "double" \'single\' {json}',
+                "",
                 "",
                 "",
             ],
@@ -415,6 +425,7 @@ def build_notes(model: genanki.Model) -> list[genanki.Note]:
                 "",
                 "",
                 "",
+                "",
             ],
             ["edge", "empty-notes"],
         ),
@@ -427,7 +438,8 @@ def build_notes(model: genanki.Model) -> list[genanki.Note]:
                 "",
                 "",
                 "用于测试 extra 非法时模板的降级能力。",
-                '{"image":"broken.png","masks":[}',
+                invalid_json_fixture('{"image":"broken.png","masks":[}'),
+                "",
                 "",
             ],
             ["edge", "bad-extra"],
@@ -441,6 +453,7 @@ def build_notes(model: genanki.Model) -> list[genanki.Note]:
                 "",
                 "标签应换行显示。",
                 "给这张卡添加多个 tag，用于测试标签区换行。",
+                "",
                 "",
                 "",
             ],
@@ -457,6 +470,7 @@ def build_notes(model: genanki.Model) -> list[genanki.Note]:
                 "开启随机顺序后，正面与背面的选项顺序必须完全一致。",
                 "",
                 "",
+                "",
             ],
             ["edge", "random-order"],
         ),
@@ -471,8 +485,54 @@ def build_notes(model: genanki.Model) -> list[genanki.Note]:
                 "本卡用于和 F02、O01 交叉测试状态隔离。",
                 "",
                 "",
+                "",
             ],
             ["edge", "state-isolation"],
+        ),
+        note(
+            model,
+            [
+                "R07",
+                "qa",
+                "What does <div> mean? C++ 类型 std::vector<int> 中的尖括号必须保留。",
+                "",
+                "std::vector<int>",
+                "普通文本中的 <div>、<int> 和 x < y > z 不得被识别成 HTML。",
+                "",
+                "",
+                "",
+            ],
+            ["edge", "literal-angle-brackets"],
+        ),
+        note(
+            model,
+            [
+                "R08",
+                "qa",
+                trusted_html("Shell 示例：<code>echo $HOME</code>；价格示例：<code>$5</code>。"),
+                "",
+                "代码元素中的美元符号不是数学分隔符。",
+                "普通文本中的 $x$ 仍应作为行内数学公式处理。",
+                "",
+                "",
+                "",
+            ],
+            ["edge", "math-code"],
+        ),
+        note(
+            model,
+            [
+                "R09",
+                "mindmap",
+                "extra 中的节点文本必须按纯文本渲染。",
+                "",
+                "",
+                "节点文本不可创建 img 元素或执行事件属性。",
+                '{"mindmap":[{"text":"<img src=x onerror=document.documentElement.dataset.injected=1>"}]}',
+                "",
+                "",
+            ],
+            ["edge", "json-text-injection"],
         ),
     ]
 

@@ -1,16 +1,22 @@
 import {
+  DEFAULT_SETTINGS,
   STORAGE_KEYS,
   type Mask,
   type MindmapNode,
   type Settings,
   byId,
+  cardStateKey,
+  escapeAttribute,
+  escapeHtml,
   flagMapToList,
   listToFlagMap,
   loadSessionState,
   loadSettings,
   mountAudio,
   normalizeCard,
+  normalizeMasks,
   normalizeMathHtml,
+  normalizeOcclusionImageHtml,
   queueMathTypeset,
   readFields,
   renderCloze,
@@ -39,12 +45,15 @@ interface FrontState {
 
 const card = normalizeCard(readFields());
 const settings = loadSettings();
+const stateKey = cardStateKey(card);
 const state: FrontState = {
-  selectedMap: listToFlagMap(splitItems(loadSessionState(STORAGE_KEYS.selectedPrefix, card.id, ""))),
-  fillDraft: parseDraft(loadSessionState(STORAGE_KEYS.fillPrefix, card.id, "{}")),
-  visibleMasks: listToFlagMap(splitItems(loadSessionState(STORAGE_KEYS.occlusionPrefix, card.id, ""))),
-  optionOrder: splitItems(loadSessionState(STORAGE_KEYS.orderPrefix, card.id, "")),
+  selectedMap: listToFlagMap(splitItems(loadSessionState(STORAGE_KEYS.selectedPrefix, stateKey, ""))),
+  fillDraft: parseDraft(loadSessionState(STORAGE_KEYS.fillPrefix, stateKey, "{}")),
+  visibleMasks: listToFlagMap(splitItems(loadSessionState(STORAGE_KEYS.occlusionPrefix, stateKey, ""))),
+  optionOrder: splitItems(loadSessionState(STORAGE_KEYS.orderPrefix, stateKey, "")),
 };
+let choiceOptionsVisible = settings.choiceDisplay === "immediate" || flagMapToList(state.selectedMap).length > 0;
+let choiceRevealTimer: number | undefined;
 
 function parseDraft(raw: string): Record<string, string> {
   try {
@@ -69,7 +78,7 @@ function renderPrompt(): void {
 }
 
 function persistSelectedMap(): void {
-  saveSessionState(STORAGE_KEYS.selectedPrefix, card.id, flagMapToList(state.selectedMap).join("||"));
+  saveSessionState(STORAGE_KEYS.selectedPrefix, stateKey, flagMapToList(state.selectedMap).join("||"));
 }
 
 function countSelected(): number {
@@ -95,7 +104,7 @@ function getChoiceOrder(): ChoiceOption[] {
     [shuffled[index], shuffled[randomIndex]] = [shuffled[randomIndex], shuffled[index]];
   }
   state.optionOrder = shuffled.map((item) => item.key);
-  saveSessionState(STORAGE_KEYS.orderPrefix, card.id, state.optionOrder.join("||"));
+  saveSessionState(STORAGE_KEYS.orderPrefix, stateKey, state.optionOrder.join("||"));
   return shuffled;
 }
 
@@ -120,7 +129,42 @@ function bindChoiceButtons(): void {
   });
 }
 
+function clearChoiceRevealTimer(): void {
+  if (choiceRevealTimer !== undefined) {
+    window.clearTimeout(choiceRevealTimer);
+    choiceRevealTimer = undefined;
+  }
+}
+
+function resetChoiceVisibility(): void {
+  clearChoiceRevealTimer();
+  choiceOptionsVisible = settings.choiceDisplay === "immediate" || countSelected() > 0;
+}
+
+function showChoiceOptions(focusFirst: boolean): void {
+  choiceOptionsVisible = true;
+  renderChoice();
+  queueMathTypeset(["front-interaction"]);
+  if (focusFirst) {
+    document.querySelector<HTMLElement>("[data-option-key]")?.focus();
+  }
+}
+
 function renderChoice(): void {
+  clearChoiceRevealTimer();
+  if (!choiceOptionsVisible && settings.choiceDisplay === "manual") {
+    byId("front-interaction").innerHTML = '<div class="choice-gate" role="status" aria-live="polite"><div class="choice-gate-message">请先在心中作答，再手动显示选项。</div></div>';
+    byId("front-controls").innerHTML = '<button class="ghost-button" id="choice-reveal" type="button">显示选项</button>';
+    byId<HTMLButtonElement>("choice-reveal").onclick = () => showChoiceOptions(true);
+    return;
+  }
+  if (!choiceOptionsVisible && settings.choiceDisplay === "delay" && settings.choiceDelayMs > 0) {
+    byId("front-interaction").innerHTML = `<div class="choice-gate" role="status" aria-live="polite"><div class="choice-gate-message">请先在心中作答，选项将在 ${settings.choiceDelayMs} ms 后显示。</div></div>`;
+    byId("front-controls").innerHTML = "";
+    choiceRevealTimer = window.setTimeout(() => showChoiceOptions(false), settings.choiceDelayMs);
+    return;
+  }
+  choiceOptionsVisible = true;
   const options = getChoiceOrder();
   const html = options
     .map((option, index) => {
@@ -142,7 +186,7 @@ function persistFillDraft(): void {
     }
   });
   state.fillDraft = draft;
-  saveSessionState(STORAGE_KEYS.fillPrefix, card.id, JSON.stringify(draft));
+  saveSessionState(STORAGE_KEYS.fillPrefix, stateKey, JSON.stringify(draft));
 }
 
 function bindFillInputs(): void {
@@ -172,7 +216,7 @@ function renderFillControls(): void {
   };
   byId<HTMLElement>("fill-clear").onclick = () => {
     state.fillDraft = {};
-    saveSessionState(STORAGE_KEYS.fillPrefix, card.id, "{}");
+    saveSessionState(STORAGE_KEYS.fillPrefix, stateKey, "{}");
     renderPrompt();
     bindFillInputs();
   };
@@ -180,15 +224,14 @@ function renderFillControls(): void {
 }
 
 function getOcclusionMasks(): Mask[] {
-  const masks = Array.isArray(card.extra.masks) ? (card.extra.masks as Mask[]) : [];
-  return sortMasks(masks, settings.occlusionOrder);
+  return sortMasks(normalizeMasks(card.extra.masks), settings.occlusionOrder);
 }
 
 function persistVisibleMasks(masks: Mask[]): void {
   const visible = masks
     .map((mask, index) => String(mask.id || index + 1))
     .filter((id) => state.visibleMasks[id]);
-  saveSessionState(STORAGE_KEYS.occlusionPrefix, card.id, visible.join("||"));
+  saveSessionState(STORAGE_KEYS.occlusionPrefix, stateKey, visible.join("||"));
 }
 
 function bindOcclusionButtons(masks: Mask[]): void {
@@ -229,7 +272,8 @@ function bindOcclusionButtons(masks: Mask[]): void {
 
 function renderOcclusion(): void {
   const masks = getOcclusionMasks();
-  if (!trim(card.occlusionImage) || !masks.length) {
+  const occlusionImage = normalizeOcclusionImageHtml(card.occlusionImage);
+  if (!trim(occlusionImage) || !masks.length) {
     byId("front-interaction").innerHTML = '<div class="info-card">图片遮挡数据无效，已跳过交互渲染。</div>';
     byId("front-controls").innerHTML = "";
     return;
@@ -237,22 +281,31 @@ function renderOcclusion(): void {
   const maskHtml = masks
     .map((mask, index) => {
       const id = String(mask.id || index + 1);
+      const label = mask.label || `遮挡 ${index + 1}`;
       const revealed = state.visibleMasks[id] ? " is-revealed" : "";
-      return `<button class="occlusion-mask${revealed}" type="button" data-mask-id="${id}" style="left:${Number(mask.x || 0)}%;top:${Number(mask.y || 0)}%;width:${Number(mask.w || 10)}%;height:${Number(mask.h || 10)}%;"><span>${mask.label || ""}</span></button>`;
+      return `<button class="occlusion-mask${revealed}" type="button" data-mask-id="${escapeAttribute(id)}" aria-label="${escapeAttribute(label)}" style="left:${mask.x}%;top:${mask.y}%;width:${mask.w}%;height:${mask.h}%;"><span>${escapeHtml(mask.label || "")}</span></button>`;
     })
     .join("");
-  byId("front-interaction").innerHTML = `<div class="occlusion-shell"><div class="occlusion-canvas">${card.occlusionImage}${maskHtml}</div></div>`;
+  byId("front-interaction").innerHTML = `<div class="occlusion-shell"><div class="occlusion-canvas">${occlusionImage}${maskHtml}</div></div>`;
   byId("front-controls").innerHTML = '<button class="ghost-button" type="button" id="mask-next">显示下一个挖空</button><button class="ghost-button" type="button" id="mask-toggle">切换全部遮挡</button>';
   bindOcclusionButtons(masks);
 }
 
-function renderMindmapNode(node: MindmapNode): string {
+function renderMindmapNode(node: MindmapNode, depth: number, budget: { count: number }): string {
+  if (depth > 32 || budget.count >= 1000) {
+    return "";
+  }
+  budget.count += 1;
   const children = Array.isArray(node.children) ? node.children : [];
-  const toggle = children.length ? "▸" : "•";
-  const childHtml = children.length
-    ? `<ul class="mindmap-children">${children.map((child) => renderMindmapNode(child)).join("")}</ul>`
-    : "";
-  return `<li class="mindmap-node"><button class="mindmap-toggle" type="button">${toggle}</button><div class="mindmap-label">${renderInlineCloze(String(node.text || ""), "front")}</div>${childHtml}</li>`;
+  const childHtml = children
+    .map((child) => renderMindmapNode(child, depth + 1, budget))
+    .filter(Boolean)
+    .join("");
+  const toggle = childHtml
+    ? '<button class="mindmap-toggle" type="button" aria-expanded="true" aria-label="折叠子节点">▾</button>'
+    : '<span class="mindmap-toggle" aria-hidden="true">•</span>';
+  const childrenMarkup = childHtml ? `<ul class="mindmap-children">${childHtml}</ul>` : "";
+  return `<li class="mindmap-node">${toggle}<div class="mindmap-label">${renderInlineCloze(String(node.text || ""), "front")}</div>${childrenMarkup}</li>`;
 }
 
 function bindMindmapButtons(): void {
@@ -260,7 +313,10 @@ function bindMindmapButtons(): void {
     button.onclick = () => {
       const node = button.parentElement;
       if (node) {
-        node.classList.toggle("is-collapsed");
+        const collapsed = node.classList.toggle("is-collapsed");
+        button.setAttribute("aria-expanded", String(!collapsed));
+        button.setAttribute("aria-label", collapsed ? "展开子节点" : "折叠子节点");
+        button.textContent = collapsed ? "▸" : "▾";
       }
     };
   });
@@ -268,7 +324,8 @@ function bindMindmapButtons(): void {
 
 function renderMindmap(): void {
   const tree = Array.isArray(card.extra.mindmap) ? (card.extra.mindmap as MindmapNode[]) : [];
-  byId("front-interaction").innerHTML = `<ul class="mindmap-root">${tree.map((node) => renderMindmapNode(node)).join("")}</ul>`;
+  const budget = { count: 0 };
+  byId("front-interaction").innerHTML = `<ul class="mindmap-root">${tree.map((node) => renderMindmapNode(node, 0, budget)).join("")}</ul>`;
   byId("front-controls").innerHTML = "";
   bindMindmapButtons();
 }
@@ -295,13 +352,21 @@ function bindBooleanSetting(
     saveSettings(settings);
     if (key === "randomOptions") {
       state.optionOrder = [];
-      saveSessionState(STORAGE_KEYS.orderPrefix, card.id, "");
+      saveSessionState(STORAGE_KEYS.orderPrefix, stateKey, "");
     }
     renderAll();
   };
 }
 
-function bindSelectSetting(id: string, key: "fillMode" | "occlusionOrder" | "theme"): void {
+function updateChoiceDelaySettingVisibility(): void {
+  const row = byId("setting-choice-delay-row");
+  const input = byId<HTMLInputElement>("setting-choice-delay-ms");
+  const active = settings.choiceDisplay === "delay";
+  row.classList.toggle("hidden", !active);
+  input.disabled = !active;
+}
+
+function bindSelectSetting(id: string, key: "fillMode" | "occlusionOrder" | "theme" | "choiceDisplay"): void {
   const input = byId<HTMLSelectElement>(id);
   input.value = settings[key];
   input.onchange = () => {
@@ -309,6 +374,10 @@ function bindSelectSetting(id: string, key: "fillMode" | "occlusionOrder" | "the
       settings.fillMode = input.value as Settings["fillMode"];
     } else if (key === "occlusionOrder") {
       settings.occlusionOrder = input.value as Settings["occlusionOrder"];
+    } else if (key === "choiceDisplay") {
+      settings.choiceDisplay = input.value as Settings["choiceDisplay"];
+      resetChoiceVisibility();
+      updateChoiceDelaySettingVisibility();
     } else {
       settings.theme = input.value as Settings["theme"];
     }
@@ -317,12 +386,68 @@ function bindSelectSetting(id: string, key: "fillMode" | "occlusionOrder" | "the
   };
 }
 
-function bindSettings(): void {
-  byId<HTMLElement>("settings-trigger").onclick = () => {
-    byId("settings-modal").className = "modal";
+function bindChoiceDelaySetting(): void {
+  const input = byId<HTMLInputElement>("setting-choice-delay-ms");
+  input.value = String(settings.choiceDelayMs);
+  input.onchange = () => {
+    const parsed = Number(input.value);
+    settings.choiceDelayMs = Number.isFinite(parsed)
+      ? Math.min(60000, Math.max(0, Math.round(parsed)))
+      : DEFAULT_SETTINGS.choiceDelayMs;
+    input.value = String(settings.choiceDelayMs);
+    saveSettings(settings);
+    if (settings.choiceDisplay === "delay") {
+      resetChoiceVisibility();
+      renderAll();
+    }
   };
-  byId<HTMLElement>("settings-close").onclick = () => {
-    byId("settings-modal").className = "modal hidden";
+  updateChoiceDelaySettingVisibility();
+}
+
+function bindSettings(): void {
+  const trigger = byId<HTMLButtonElement>("settings-trigger");
+  const modal = byId("settings-modal");
+  const closeButton = byId<HTMLButtonElement>("settings-close");
+  const closeSettings = (): void => {
+    modal.className = "modal hidden";
+    modal.setAttribute("aria-hidden", "true");
+    trigger.setAttribute("aria-expanded", "false");
+    trigger.focus();
+  };
+  trigger.onclick = () => {
+    modal.className = "modal";
+    modal.setAttribute("aria-hidden", "false");
+    trigger.setAttribute("aria-expanded", "true");
+    closeButton.focus();
+  };
+  closeButton.onclick = closeSettings;
+  modal.onclick = (event) => {
+    if (event.target === modal) {
+      closeSettings();
+    }
+  };
+  modal.onkeydown = (event) => {
+    if (event.key === "Escape") {
+      event.preventDefault();
+      closeSettings();
+      return;
+    }
+    if (event.key !== "Tab") {
+      return;
+    }
+    const focusable = Array.from(modal.querySelectorAll<HTMLElement>("button, input, select, [tabindex]:not([tabindex='-1'])"));
+    const first = focusable[0];
+    const last = focusable[focusable.length - 1];
+    if (!first || !last) {
+      return;
+    }
+    if (event.shiftKey && document.activeElement === first) {
+      event.preventDefault();
+      last.focus();
+    } else if (!event.shiftKey && document.activeElement === last) {
+      event.preventDefault();
+      first.focus();
+    }
   };
   bindBooleanSetting("setting-show-type", "showType");
   bindBooleanSetting("setting-show-deck", "showDeck");
@@ -330,27 +455,29 @@ function bindSettings(): void {
   bindBooleanSetting("setting-auto-flip", "autoFlip");
   bindBooleanSetting("setting-random-options", "randomOptions");
   bindBooleanSetting("setting-choice-stats", "choiceStats");
+  bindSelectSetting("setting-choice-display", "choiceDisplay");
+  bindChoiceDelaySetting();
   bindSelectSetting("setting-fill-mode", "fillMode");
   bindSelectSetting("setting-occlusion-order", "occlusionOrder");
   bindSelectSetting("setting-theme", "theme");
 }
 
 function bindSpaceFlip(): void {
-  document.onkeydown = (event) => {
+  document.addEventListener("keydown", (event) => {
     const target = event.target as HTMLElement | null;
     const tagName = target?.tagName.toLowerCase() || "";
-    if (tagName === "input" || tagName === "textarea") {
+    const ignoresSpace = tagName === "input"
+      || tagName === "textarea"
+      || tagName === "select"
+      || tagName === "button"
+      || Boolean(target?.isContentEditable)
+      || !byId("settings-modal").classList.contains("hidden");
+    if (ignoresSpace || event.key !== " ") {
       return;
     }
-    if (event.keyCode === 32) {
-      if (typeof event.preventDefault === "function") {
-        event.preventDefault();
-      } else {
-        event.returnValue = false;
-      }
-      revealAnswer();
-    }
-  };
+    event.preventDefault();
+    revealAnswer();
+  });
 }
 
 function renderInteraction(): void {

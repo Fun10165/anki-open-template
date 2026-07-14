@@ -1,68 +1,55 @@
-<div id="anki-startup-probe" style="margin:12px 12px 0 12px;padding:8px 10px;border-radius:10px;background:#fff8db;color:#7a5d00;border:1px solid #e6cf7a;font-size:12px;line-height:1.4;">
-  probe: html loaded
-</div>
-
 <script>
-(function () {
-  var probe = document.getElementById("anki-startup-probe");
-  if (probe) {
-    probe.textContent = "probe: debug bootstrap running";
-  }
-  if (window.__ankiAwesomeSelectDebugInstalled) {
-    if (probe) {
-      probe.textContent = "probe: debug bootstrap reused";
+  (function () {
+    if (window.__ankiAwesomeSelectDebugInstalled) {
+      return;
     }
-    return;
-  }
-  window.__ankiAwesomeSelectDebugInstalled = true;
-  function showDebug(message) {
-    try {
-      var panel = document.getElementById("anki-debug-panel");
-      if (!panel) {
-        panel = document.createElement("pre");
-        panel.id = "anki-debug-panel";
-        panel.style.whiteSpace = "pre-wrap";
-        panel.style.wordBreak = "break-word";
-        panel.style.background = "#fff1f1";
-        panel.style.color = "#a40000";
-        panel.style.border = "1px solid #ffb3b3";
-        panel.style.borderRadius = "12px";
-        panel.style.padding = "12px";
-        panel.style.margin = "12px 12px 0 12px";
-        panel.style.fontSize = "12px";
-        panel.style.lineHeight = "1.5";
-        panel.style.fontFamily = "ui-monospace, SFMono-Regular, Menlo, Consolas, monospace";
-        document.addEventListener("DOMContentLoaded", function () {
-          document.body.insertBefore(panel, document.body.firstChild);
-        }, { once: true });
-        if (document.body) {
-          document.body.insertBefore(panel, document.body.firstChild);
+    window.__ankiAwesomeSelectDebugInstalled = true;
+    function showDebug(message) {
+      try {
+        var panel = document.getElementById("anki-debug-panel");
+        if (!panel) {
+          panel = document.createElement("pre");
+          panel.id = "anki-debug-panel";
+          panel.style.whiteSpace = "pre-wrap";
+          panel.style.wordBreak = "break-word";
+          panel.style.background = "#fff1f1";
+          panel.style.color = "#a40000";
+          panel.style.border = "1px solid #ffb3b3";
+          panel.style.borderRadius = "12px";
+          panel.style.padding = "12px";
+          panel.style.margin = "12px 12px 0 12px";
+          panel.style.fontSize = "12px";
+          panel.style.lineHeight = "1.5";
+          panel.style.fontFamily = "ui-monospace, SFMono-Regular, Menlo, Consolas, monospace";
+          if (document.body) {
+            document.body.insertBefore(panel, document.body.firstChild);
+          } else {
+            document.addEventListener("DOMContentLoaded", function () {
+              document.body.insertBefore(panel, document.body.firstChild);
+            }, {once: true});
+          }
         }
-      }
-      panel.textContent = message;
-    } catch (_error) {}
-  }
-  window.onerror = function (message, source, lineno, colno, error) {
-    showDebug(
-      "[anki-open-template back error]\\n" +
-      "message: " + String(message) + "\\n" +
-      "source: " + String(source || "") + "\\n" +
-      "line: " + String(lineno || 0) + "\\n" +
-      "column: " + String(colno || 0) + "\\n" +
-      "stack: " + String(error && error.stack ? error.stack : "")
-    );
-  };
-  window.addEventListener("unhandledrejection", function (event) {
-    var reason = event && event.reason ? event.reason : "";
-    showDebug(
-      "[anki-open-template back rejection]\\n" +
-      String(reason && reason.stack ? reason.stack : reason)
-    );
-  });
-  if (probe) {
-    probe.textContent = "probe: debug bootstrap ready";
-  }
-})();
+        panel.textContent = message;
+      } catch (_error) { }
+    }
+    window.addEventListener("error", function (event) {
+      showDebug(
+        "[anki-open-template back error]\\n" +
+        "message: " + String(event.message || "") + "\\n" +
+        "source: " + String(event.filename || "") + "\\n" +
+        "line: " + String(event.lineno || 0) + "\\n" +
+        "column: " + String(event.colno || 0) + "\\n" +
+        "stack: " + String(event.error && event.error.stack ? event.error.stack : "")
+      );
+    });
+    window.addEventListener("unhandledrejection", function (event) {
+      var reason = event && event.reason ? event.reason : "";
+      showDebug(
+        "[anki-open-template back rejection]\\n" +
+        String(reason && reason.stack ? reason.stack : reason)
+      );
+    });
+  })();
 </script>
 
 <div id="field-store" class="hidden">
@@ -104,16 +91,5 @@
 <div id="back-footer" class="footer">V95 Rebuild · 晚期多题型模板</div>
 
 <script>
-/*__SCRIPT__*/
-</script>
-<script>
-(function () {
-  var probe = document.getElementById("anki-startup-probe");
-  if (probe) {
-    probe.style.background = "#e9fff0";
-    probe.style.borderColor = "#86d39d";
-    probe.style.color = "#176b2c";
-    probe.textContent = "probe: main script finished";
-  }
-})();
+  /*__SCRIPT__*/
 </script>

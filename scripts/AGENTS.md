@@ -31,10 +31,10 @@ generate_apkg.py model helpers ──────────────── 
 
 ## PYTHON SIDE
 
-- Run APKG scripts with `./.venv/bin/python`; Python dependencies are pinned in root `requirements.txt`.
+- Run APKG scripts with `uv run scripts/<generator>.py`; dependencies are locked by `pyproject.toml` and `uv.lock`. Existing `.venv/bin/python` entry points remain compatible for established local environments.
 - `generate_apkg.py` defines the shared `MODEL_ID = 1607392319` and the 9-field note model.
 - Test deck `DECK_ID = 2059400111`; automata deck `DECK_ID = 2059400211`; data-structures decks use `205940031x`; RISC-V deck `DECK_ID = 2059400611` to avoid that range.
-- Consumer APKG scripts import `ROOT`, `build_model`, `note`, and `write_deck` from `generate_apkg.py` instead of duplicating model or package-writing logic.
+- Consumer APKG scripts import shared helpers from `generate_apkg.py` instead of duplicating model or package-writing logic. Ordinary strings are escaped; intentional rich HTML must wrap the final complete field value with `trusted_html(...)`.
 - `write_deck()` assigns stable note GUIDs from `(DECK_ID, card id)` and rejects duplicate card IDs within a deck, so repeated imports update existing notes instead of creating duplicates.
 - `ensure_test_audio()` creates `media/test.wav` if absent; PNG media still must be present for image cards.
 
@@ -50,7 +50,9 @@ generate_apkg.py model helpers ──────────────── 
 ## COMMANDS
 
 ```bash
-npm run build:templates
-./.venv/bin/python scripts/generate_apkg.py
-./.venv/bin/python scripts/generate_automata_apkg.py
+npm run build
+npm test
+uv run scripts/generate_apkg.py
+uv run scripts/generate_automata_apkg.py
+uv run -m unittest discover -s tests -p "test_*.py"
 ```

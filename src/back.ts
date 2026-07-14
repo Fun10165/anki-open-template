@@ -3,14 +3,18 @@ import {
   type Mask,
   type MindmapNode,
   byId,
+  cardStateKey,
   clearReviewState,
+  escapeHtml,
   collectClozeTokens,
   listToFlagMap,
   loadSessionState,
   loadSettings,
   mountAudio,
   normalizeCard,
+  normalizeMasks,
   normalizeMathHtml,
+  normalizeOcclusionImageHtml,
   queueMathTypeset,
   readFields,
   renderCloze,
@@ -29,10 +33,11 @@ interface ChoiceOption {
 
 const card = normalizeCard(readFields());
 const settings = loadSettings();
-const selectedList = splitItems(loadSessionState(STORAGE_KEYS.selectedPrefix, card.id, ""));
-const fillDraft = parseDraft(loadSessionState(STORAGE_KEYS.fillPrefix, card.id, "{}"));
-const visibleMasks = listToFlagMap(splitItems(loadSessionState(STORAGE_KEYS.occlusionPrefix, card.id, "")));
-const optionOrder = splitItems(loadSessionState(STORAGE_KEYS.orderPrefix, card.id, ""));
+const stateKey = cardStateKey(card);
+const selectedList = splitItems(loadSessionState(STORAGE_KEYS.selectedPrefix, stateKey, ""));
+const fillDraft = parseDraft(loadSessionState(STORAGE_KEYS.fillPrefix, stateKey, "{}"));
+const visibleMasks = listToFlagMap(splitItems(loadSessionState(STORAGE_KEYS.occlusionPrefix, stateKey, "")));
+const optionOrder = splitItems(loadSessionState(STORAGE_KEYS.orderPrefix, stateKey, ""));
 
 function parseDraft(raw: string): Record<string, string> {
   try {
@@ -109,7 +114,7 @@ function renderFill(): void {
     .map((token, index) => {
       const value = fillDraft[String(index + 1)] || "";
       const matched = trim(value) === trim(token.answer);
-      return `<div class="result-row"><span class="result-index">空${index + 1}</span><span class="result-user ${matched ? "is-correct" : "is-wrong"}">${value || "未填写"}</span><span class="result-answer">正确答案：${token.answer}</span></div>`;
+      return `<div class="result-row"><span class="result-index">空${index + 1}</span><span class="result-user ${matched ? "is-correct" : "is-wrong"}">${escapeHtml(value || "未填写")}</span><span class="result-answer">正确答案：${escapeHtml(token.answer)}</span></div>`;
     })
     .join("");
   byId("back-interaction").innerHTML = `<div class="result-list">${rows}</div>`;
@@ -117,13 +122,13 @@ function renderFill(): void {
 }
 
 function getOcclusionMasks(): Mask[] {
-  const masks = Array.isArray(card.extra.masks) ? (card.extra.masks as Mask[]) : [];
-  return sortMasks(masks, settings.occlusionOrder);
+  return sortMasks(normalizeMasks(card.extra.masks), settings.occlusionOrder);
 }
 
 function renderOcclusion(): void {
   const masks = getOcclusionMasks();
-  if (!trim(card.occlusionImage) || !masks.length) {
+  const occlusionImage = normalizeOcclusionImageHtml(card.occlusionImage);
+  if (!trim(occlusionImage) || !masks.length) {
     byId("back-interaction").innerHTML = '<div class="info-card">图片遮挡数据无效，无法展示背面结果。</div>';
     byId("answer-summary").textContent = "遮挡数据无效";
     return;
@@ -132,25 +137,31 @@ function renderOcclusion(): void {
     .map((mask, index) => {
       const id = String(mask.id || index + 1);
       const revealed = visibleMasks[id] ? " is-revealed" : "";
-      return `<div class="occlusion-mask is-answer${revealed}" style="left:${Number(mask.x || 0)}%;top:${Number(mask.y || 0)}%;width:${Number(mask.w || 10)}%;height:${Number(mask.h || 10)}%;"><span>${mask.label || ""}</span></div>`;
+      return `<div class="occlusion-mask is-answer${revealed}" style="left:${mask.x}%;top:${mask.y}%;width:${mask.w}%;height:${mask.h}%;"><span>${escapeHtml(mask.label || "")}</span></div>`;
     })
     .join("");
-  byId("back-interaction").innerHTML = `<div class="occlusion-shell"><div class="occlusion-canvas">${card.occlusionImage}${maskHtml}</div></div>`;
+  byId("back-interaction").innerHTML = `<div class="occlusion-shell"><div class="occlusion-canvas">${occlusionImage}${maskHtml}</div></div>`;
   byId("answer-summary").textContent = "已显示全部遮挡区域";
 }
 
-function renderMindmapNode(node: MindmapNode): string {
+function renderMindmapNode(node: MindmapNode, depth: number, budget: { count: number }): string {
+  if (depth > 32 || budget.count >= 1000) {
+    return "";
+  }
+  budget.count += 1;
   const children = Array.isArray(node.children) ? node.children : [];
-  const toggle = children.length ? "▾" : "•";
-  const childHtml = children.length
-    ? `<ul class="mindmap-children">${children.map((child) => renderMindmapNode(child)).join("")}</ul>`
-    : "";
-  return `<li class="mindmap-node"><span class="mindmap-toggle">${toggle}</span><div class="mindmap-label">${renderInlineCloze(String(node.text || ""), "back")}</div>${childHtml}</li>`;
+  const childHtml = children
+    .map((child) => renderMindmapNode(child, depth + 1, budget))
+    .filter(Boolean)
+    .join("");
+  const childrenMarkup = childHtml ? `<ul class="mindmap-children">${childHtml}</ul>` : "";
+  return `<li class="mindmap-node"><span class="mindmap-toggle" aria-hidden="true">${childHtml ? "▾" : "•"}</span><div class="mindmap-label">${renderInlineCloze(String(node.text || ""), "back")}</div>${childrenMarkup}</li>`;
 }
 
 function renderMindmap(): void {
   const tree = Array.isArray(card.extra.mindmap) ? (card.extra.mindmap as MindmapNode[]) : [];
-  byId("back-interaction").innerHTML = `<ul class="mindmap-root">${tree.map((node) => renderMindmapNode(node)).join("")}</ul>`;
+  const budget = { count: 0 };
+  byId("back-interaction").innerHTML = `<ul class="mindmap-root">${tree.map((node) => renderMindmapNode(node, 0, budget)).join("")}</ul>`;
   byId("answer-summary").textContent = "思维导图已展开";
 }
 
@@ -182,7 +193,8 @@ function renderInteraction(): void {
     renderMindmap();
     return;
   }
-  byId("back-interaction").innerHTML = `<div class="info-card">答案：${card.answers.join(" / ") || "请结合解析阅读"}</div>`;
+  const answer = card.answers.join(" / ") || "请结合解析阅读";
+  byId("back-interaction").innerHTML = `<div class="info-card">答案：${escapeHtml(answer)}</div>`;
   byId("answer-summary").textContent = card.answers.join(" / ") || "已翻到背面";
 }
 
@@ -193,7 +205,7 @@ function main(): void {
   renderInteraction();
   renderNotes();
   mountAudio(byId("audio-panel"), card.audio);
-  clearReviewState(card.id);
+  clearReviewState(stateKey);
   queueMathTypeset(["prompt", "back-interaction", "notes-panel"]);
 }
 

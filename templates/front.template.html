@@ -1,68 +1,55 @@
-<div id="anki-startup-probe" style="margin:12px 12px 0 12px;padding:8px 10px;border-radius:10px;background:#fff8db;color:#7a5d00;border:1px solid #e6cf7a;font-size:12px;line-height:1.4;">
-  probe: html loaded
-</div>
-
 <script>
-(function () {
-  var probe = document.getElementById("anki-startup-probe");
-  if (probe) {
-    probe.textContent = "probe: debug bootstrap running";
-  }
-  if (window.__ankiAwesomeSelectDebugInstalled) {
-    if (probe) {
-      probe.textContent = "probe: debug bootstrap reused";
+  (function () {
+    if (window.__ankiAwesomeSelectDebugInstalled) {
+      return;
     }
-    return;
-  }
-  window.__ankiAwesomeSelectDebugInstalled = true;
-  function showDebug(message) {
-    try {
-      var panel = document.getElementById("anki-debug-panel");
-      if (!panel) {
-        panel = document.createElement("pre");
-        panel.id = "anki-debug-panel";
-        panel.style.whiteSpace = "pre-wrap";
-        panel.style.wordBreak = "break-word";
-        panel.style.background = "#fff1f1";
-        panel.style.color = "#a40000";
-        panel.style.border = "1px solid #ffb3b3";
-        panel.style.borderRadius = "12px";
-        panel.style.padding = "12px";
-        panel.style.margin = "12px 12px 0 12px";
-        panel.style.fontSize = "12px";
-        panel.style.lineHeight = "1.5";
-        panel.style.fontFamily = "ui-monospace, SFMono-Regular, Menlo, Consolas, monospace";
-        document.addEventListener("DOMContentLoaded", function () {
-          document.body.insertBefore(panel, document.body.firstChild);
-        }, { once: true });
-        if (document.body) {
-          document.body.insertBefore(panel, document.body.firstChild);
+    window.__ankiAwesomeSelectDebugInstalled = true;
+    function showDebug(message) {
+      try {
+        var panel = document.getElementById("anki-debug-panel");
+        if (!panel) {
+          panel = document.createElement("pre");
+          panel.id = "anki-debug-panel";
+          panel.style.whiteSpace = "pre-wrap";
+          panel.style.wordBreak = "break-word";
+          panel.style.background = "#fff1f1";
+          panel.style.color = "#a40000";
+          panel.style.border = "1px solid #ffb3b3";
+          panel.style.borderRadius = "12px";
+          panel.style.padding = "12px";
+          panel.style.margin = "12px 12px 0 12px";
+          panel.style.fontSize = "12px";
+          panel.style.lineHeight = "1.5";
+          panel.style.fontFamily = "ui-monospace, SFMono-Regular, Menlo, Consolas, monospace";
+          if (document.body) {
+            document.body.insertBefore(panel, document.body.firstChild);
+          } else {
+            document.addEventListener("DOMContentLoaded", function () {
+              document.body.insertBefore(panel, document.body.firstChild);
+            }, {once: true});
+          }
         }
-      }
-      panel.textContent = message;
-    } catch (_error) {}
-  }
-  window.onerror = function (message, source, lineno, colno, error) {
-    showDebug(
-      "[anki-open-template front error]\\n" +
-      "message: " + String(message) + "\\n" +
-      "source: " + String(source || "") + "\\n" +
-      "line: " + String(lineno || 0) + "\\n" +
-      "column: " + String(colno || 0) + "\\n" +
-      "stack: " + String(error && error.stack ? error.stack : "")
-    );
-  };
-  window.addEventListener("unhandledrejection", function (event) {
-    var reason = event && event.reason ? event.reason : "";
-    showDebug(
-      "[anki-open-template front rejection]\\n" +
-      String(reason && reason.stack ? reason.stack : reason)
-    );
-  });
-  if (probe) {
-    probe.textContent = "probe: debug bootstrap ready";
-  }
-})();
+        panel.textContent = message;
+      } catch (_error) { }
+    }
+    window.addEventListener("error", function (event) {
+      showDebug(
+        "[anki-open-template front error]\\n" +
+        "message: " + String(event.message || "") + "\\n" +
+        "source: " + String(event.filename || "") + "\\n" +
+        "line: " + String(event.lineno || 0) + "\\n" +
+        "column: " + String(event.colno || 0) + "\\n" +
+        "stack: " + String(event.error && event.error.stack ? event.error.stack : "")
+      );
+    });
+    window.addEventListener("unhandledrejection", function (event) {
+      var reason = event && event.reason ? event.reason : "";
+      showDebug(
+        "[anki-open-template front rejection]\\n" +
+        String(reason && reason.stack ? reason.stack : reason)
+      );
+    });
+  })();
 </script>
 
 <div id="field-store" class="hidden">
@@ -83,7 +70,8 @@
   <div class="card-shell">
     <div class="card-toolbar">
       <div id="deck-name" class="deck-name"></div>
-      <button id="settings-trigger" class="ghost-button" type="button">卡片设置</button>
+      <button id="settings-trigger" class="ghost-button" type="button" aria-haspopup="dialog"
+        aria-controls="settings-modal" aria-expanded="false">卡片设置</button>
     </div>
 
     <div class="card-head">
@@ -102,10 +90,11 @@
   </div>
 </div>
 
-<div id="settings-modal" class="modal hidden">
+<div id="settings-modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="settings-title"
+  aria-hidden="true">
   <div class="modal-card">
     <div class="modal-head">
-      <div>卡片设置</div>
+      <div id="settings-title">卡片设置</div>
       <button id="settings-close" class="ghost-button" type="button">关闭</button>
     </div>
     <div class="settings-grid">
@@ -115,6 +104,18 @@
       <label class="setting-item"><span>自动翻转</span><input id="setting-auto-flip" type="checkbox"></label>
       <label class="setting-item"><span>随机选项</span><input id="setting-random-options" type="checkbox"></label>
       <label class="setting-item"><span>答题统计</span><input id="setting-choice-stats" type="checkbox"></label>
+      <label class="setting-item">
+        <span>选项显示</span>
+        <select id="setting-choice-display">
+          <option value="immediate">立即显示</option>
+          <option value="delay">延迟显示</option>
+          <option value="manual">手动显示</option>
+        </select>
+      </label>
+      <label id="setting-choice-delay-row" class="setting-item hidden">
+        <span>延迟时间 (ms)</span>
+        <input id="setting-choice-delay-ms" type="number" min="0" max="60000" step="100" inputmode="numeric">
+      </label>
       <label class="setting-item">
         <span>填空输入样式</span>
         <select id="setting-fill-mode">
@@ -145,16 +146,5 @@
 <div id="front-footer" class="footer">V95 Rebuild · 晚期多题型模板</div>
 
 <script>
-/*__SCRIPT__*/
-</script>
-<script>
-(function () {
-  var probe = document.getElementById("anki-startup-probe");
-  if (probe) {
-    probe.style.background = "#e9fff0";
-    probe.style.borderColor = "#86d39d";
-    probe.style.color = "#176b2c";
-    probe.textContent = "probe: main script finished";
-  }
-})();
+  /*__SCRIPT__*/
 </script>

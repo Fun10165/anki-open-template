@@ -34,6 +34,8 @@ export interface Settings {
   autoFlip: boolean;
   randomOptions: boolean;
   choiceStats: boolean;
+  choiceDisplay: "immediate" | "delay" | "manual";
+  choiceDelayMs: number;
   fillMode: "line" | "box" | "mask";
   occlusionOrder: "tb-lr" | "lr-tb";
   theme: "warm" | "mint" | "slate";
@@ -65,6 +67,8 @@ export const DEFAULT_SETTINGS: Settings = {
   autoFlip: true,
   randomOptions: false,
   choiceStats: true,
+  choiceDisplay: "immediate",
+  choiceDelayMs: 1500,
   fillMode: "line",
   occlusionOrder: "tb-lr",
   theme: "warm",
@@ -139,8 +143,30 @@ export function parseJSON<T>(value: string, fallback: T): T {
 export function loadSettings(): Settings {
   try {
     const raw = window.localStorage.getItem(STORAGE_KEYS.settings);
-    const parsed = parseJSON<Partial<Settings>>(raw || "", {});
-    return { ...DEFAULT_SETTINGS, ...parsed };
+    const parsed = parseJSON<Record<string, unknown>>(raw || "", {});
+    return {
+      showType: typeof parsed.showType === "boolean" ? parsed.showType : DEFAULT_SETTINGS.showType,
+      showDeck: typeof parsed.showDeck === "boolean" ? parsed.showDeck : DEFAULT_SETTINGS.showDeck,
+      showNotesFront: typeof parsed.showNotesFront === "boolean" ? parsed.showNotesFront : DEFAULT_SETTINGS.showNotesFront,
+      autoFlip: typeof parsed.autoFlip === "boolean" ? parsed.autoFlip : DEFAULT_SETTINGS.autoFlip,
+      randomOptions: typeof parsed.randomOptions === "boolean" ? parsed.randomOptions : DEFAULT_SETTINGS.randomOptions,
+      choiceStats: typeof parsed.choiceStats === "boolean" ? parsed.choiceStats : DEFAULT_SETTINGS.choiceStats,
+      choiceDisplay: parsed.choiceDisplay === "delay" || parsed.choiceDisplay === "manual" || parsed.choiceDisplay === "immediate"
+        ? parsed.choiceDisplay
+        : DEFAULT_SETTINGS.choiceDisplay,
+      choiceDelayMs: typeof parsed.choiceDelayMs === "number" && Number.isFinite(parsed.choiceDelayMs)
+        ? Math.min(60000, Math.max(0, Math.round(parsed.choiceDelayMs)))
+        : DEFAULT_SETTINGS.choiceDelayMs,
+      fillMode: parsed.fillMode === "box" || parsed.fillMode === "mask" || parsed.fillMode === "line"
+        ? parsed.fillMode
+        : DEFAULT_SETTINGS.fillMode,
+      occlusionOrder: parsed.occlusionOrder === "lr-tb" || parsed.occlusionOrder === "tb-lr"
+        ? parsed.occlusionOrder
+        : DEFAULT_SETTINGS.occlusionOrder,
+      theme: parsed.theme === "mint" || parsed.theme === "slate" || parsed.theme === "warm"
+        ? parsed.theme
+        : DEFAULT_SETTINGS.theme,
+    };
   } catch {
     return { ...DEFAULT_SETTINGS };
   }
@@ -154,36 +180,40 @@ export function saveSettings(settings: Settings): void {
   }
 }
 
-export function loadSessionState(prefix: string, cardId: string, fallback: string): string {
+export function cardStateKey(card: Pick<CardData, "deck" | "id">): string {
+  return `${encodeURIComponent(card.deck || "_")}::${encodeURIComponent(card.id)}`;
+}
+
+export function loadSessionState(prefix: string, stateKey: string, fallback: string): string {
   try {
-    const value = window.sessionStorage.getItem(prefix + cardId);
+    const value = window.sessionStorage.getItem(prefix + stateKey);
     return value == null ? fallback : value;
   } catch {
     return fallback;
   }
 }
 
-export function saveSessionState(prefix: string, cardId: string, value: string): void {
+export function saveSessionState(prefix: string, stateKey: string, value: string): void {
   try {
-    window.sessionStorage.setItem(prefix + cardId, value);
+    window.sessionStorage.setItem(prefix + stateKey, value);
   } catch {
     // Ignore storage failures in restrictive environments.
   }
 }
 
-export function clearSessionState(prefix: string, cardId: string): void {
+export function clearSessionState(prefix: string, stateKey: string): void {
   try {
-    window.sessionStorage.removeItem(prefix + cardId);
+    window.sessionStorage.removeItem(prefix + stateKey);
   } catch {
     // Ignore storage failures in restrictive environments.
   }
 }
 
-export function clearReviewState(cardId: string): void {
-  clearSessionState(STORAGE_KEYS.selectedPrefix, cardId);
-  clearSessionState(STORAGE_KEYS.fillPrefix, cardId);
-  clearSessionState(STORAGE_KEYS.occlusionPrefix, cardId);
-  clearSessionState(STORAGE_KEYS.orderPrefix, cardId);
+export function clearReviewState(stateKey: string): void {
+  clearSessionState(STORAGE_KEYS.selectedPrefix, stateKey);
+  clearSessionState(STORAGE_KEYS.fillPrefix, stateKey);
+  clearSessionState(STORAGE_KEYS.occlusionPrefix, stateKey);
+  clearSessionState(STORAGE_KEYS.orderPrefix, stateKey);
 }
 
 export function splitItems(value: string): string[] {
@@ -290,12 +320,139 @@ export function flagMapToList(flags: Record<string, boolean>): string[] {
     .sort();
 }
 
-export function escapeAttribute(value: string): string {
-  return value
+export function escapeHtml(value: unknown): string {
+  return String(value ?? "")
     .split("&").join("&amp;")
-    .split('"').join("&quot;")
     .split("<").join("&lt;")
     .split(">").join("&gt;");
+}
+
+export function escapeAttribute(value: string): string {
+  return escapeHtml(value).split('"').join("&quot;");
+}
+
+export function htmlToText(html: string): string {
+  const wrapper = document.createElement("div");
+  wrapper.innerHTML = sanitizeRichHtml(html);
+  return wrapper.textContent || "";
+}
+
+function sanitizeRichHtml(html: string): string {
+  const wrapper = document.createElement("div");
+  wrapper.innerHTML = String(html || "");
+  const allowedTags: Record<string, true> = {
+    A: true,
+    B: true,
+    BLOCKQUOTE: true,
+    BR: true,
+    CODE: true,
+    DIV: true,
+    EM: true,
+    HR: true,
+    I: true,
+    IMG: true,
+    LI: true,
+    OL: true,
+    P: true,
+    PRE: true,
+    RP: true,
+    RT: true,
+    RUBY: true,
+    SPAN: true,
+    STRONG: true,
+    SUB: true,
+    SUP: true,
+    TABLE: true,
+    TBODY: true,
+    TD: true,
+    TFOOT: true,
+    TH: true,
+    THEAD: true,
+    TR: true,
+    UL: true,
+  };
+  const droppedTags: Record<string, true> = {
+    BASE: true,
+    BUTTON: true,
+    EMBED: true,
+    FORM: true,
+    IFRAME: true,
+    INPUT: true,
+    LINK: true,
+    MATH: true,
+    META: true,
+    OBJECT: true,
+    OPTION: true,
+    SCRIPT: true,
+    SELECT: true,
+    STYLE: true,
+    SVG: true,
+    TEXTAREA: true,
+  };
+  const commonAttributes: Record<string, true> = {
+    "aria-hidden": true,
+    "aria-label": true,
+    class: true,
+    role: true,
+    title: true,
+  };
+  const attributesByTag: Record<string, Record<string, true>> = {
+    A: { href: true, rel: true, target: true },
+    IMG: { alt: true, height: true, loading: true, src: true, width: true },
+    TD: { colspan: true, rowspan: true },
+    TH: { colspan: true, rowspan: true, scope: true },
+  };
+  const hasSafeUrl = (value: string, image: boolean): boolean => {
+    const normalized = value.replace(/[\u0000-\u0020]+/g, "").toLowerCase();
+    const scheme = normalized.match(/^([a-z][a-z0-9+.-]*):/);
+    if (!scheme) {
+      return true;
+    }
+    if (image && normalized.startsWith("data:image/")) {
+      return /^data:image\/(?:gif|jpeg|png|webp);base64,/.test(normalized);
+    }
+    const allowedSchemes: Record<string, true> = image
+      ? { anki: true, blob: true, file: true, http: true, https: true }
+      : { http: true, https: true, mailto: true };
+    return Boolean(allowedSchemes[scheme[1]]);
+  };
+  const sanitize = (element: Element): void => {
+    Array.from(element.children).forEach((child) => {
+      if (droppedTags[child.tagName]) {
+        child.remove();
+        return;
+      }
+      if (!allowedTags[child.tagName]) {
+        sanitize(child);
+        child.replaceWith(...Array.from(child.childNodes));
+        return;
+      }
+      const tagAttributes = attributesByTag[child.tagName] || {};
+      Array.from(child.attributes).forEach((attribute) => {
+        const name = attribute.name.toLowerCase();
+        if (!commonAttributes[name] && !tagAttributes[name]) {
+          child.removeAttribute(attribute.name);
+          return;
+        }
+        if ((name === "src" || name === "href") && !hasSafeUrl(attribute.value, child.tagName === "IMG")) {
+          child.removeAttribute(attribute.name);
+        }
+      });
+      if (child.tagName === "A" && child.getAttribute("target") === "_blank") {
+        child.setAttribute("rel", "noopener noreferrer");
+      }
+      sanitize(child);
+    });
+  };
+  sanitize(wrapper);
+  return wrapper.innerHTML;
+}
+
+export function normalizeOcclusionImageHtml(html: string): string {
+  const wrapper = document.createElement("div");
+  wrapper.innerHTML = sanitizeRichHtml(html);
+  wrapper.querySelectorAll("img").forEach((image) => image.classList.add("occlusion-image"));
+  return wrapper.innerHTML;
 }
 
 export function convertMathDelimiters(text: string): string {
@@ -334,25 +491,34 @@ export function convertMathDelimiters(text: string): string {
   return result;
 }
 
-export function normalizeMathHtml(html: string): string {
+function normalizeMathInSafeHtml(html: string): string {
   if (!trim(html)) {
     return html;
   }
   const wrapper = document.createElement("div");
-  wrapper.innerHTML = String(html || "");
+  wrapper.innerHTML = html;
+  const skippedTags: Record<string, true> = { CODE: true, PRE: true, MATH: true };
   const walk = (node: Node): void => {
     let child = node.firstChild;
     while (child) {
+      const next = child.nextSibling;
       if (child.nodeType === Node.TEXT_NODE) {
         child.nodeValue = convertMathDelimiters(child.nodeValue || "");
       } else if (child.nodeType === Node.ELEMENT_NODE) {
-        walk(child);
+        const element = child as Element;
+        if (!skippedTags[element.tagName] && !element.classList.contains("MathJax") && !element.closest("mjx-container")) {
+          walk(child);
+        }
       }
-      child = child.nextSibling;
+      child = next;
     }
   };
   walk(wrapper);
   return wrapper.innerHTML;
+}
+
+export function normalizeMathHtml(html: string): string {
+  return normalizeMathInSafeHtml(sanitizeRichHtml(html));
 }
 
 export function queueMathTypeset(ids: string[]): void {
@@ -389,6 +555,28 @@ export function queueMathTypeset(ids: string[]): void {
   }
 }
 
+function parseClozeContent(content: string): ClozeToken {
+  let separator = -1;
+  for (let index = 0; index < content.length - 1; index += 1) {
+    if (content[index] !== ":" || content[index + 1] !== ":") {
+      continue;
+    }
+    let precedingBackslashes = 0;
+    for (let slash = index - 1; slash >= 0 && content[slash] === "\\"; slash -= 1) {
+      precedingBackslashes += 1;
+    }
+    if (precedingBackslashes % 2 === 0) {
+      separator = index;
+      break;
+    }
+  }
+  const decode = (value: string): string => htmlToText(value.replace(/\\::/g, "::"));
+  return {
+    answer: decode(separator === -1 ? content : content.substring(0, separator)),
+    hint: decode(separator === -1 ? "" : content.substring(separator + 2)),
+  };
+}
+
 export function collectClozeTokens(question: string): ClozeToken[] {
   const tokens: ClozeToken[] = [];
   let cursor = 0;
@@ -403,11 +591,7 @@ export function collectClozeTokens(question: string): ClozeToken[] {
       break;
     }
     const content = question.substring(firstSep + 2, end);
-    const secondSep = content.indexOf("::");
-    tokens.push({
-      answer: secondSep === -1 ? content : content.substring(0, secondSep),
-      hint: secondSep === -1 ? "" : content.substring(secondSep + 2),
-    });
+    tokens.push(parseClozeContent(content));
     cursor = end + 2;
   }
   return tokens;
@@ -419,6 +603,7 @@ export function renderCloze(
   fillMode?: Settings["fillMode"],
   draft?: Record<string, string>,
 ): string {
+  question = sanitizeRichHtml(question);
   let html = "";
   let cursor = 0;
   let order = 0;
@@ -436,26 +621,24 @@ export function renderCloze(
     }
     html += question.substring(cursor, start);
     const content = question.substring(firstSep + 2, end);
-    const secondSep = content.indexOf("::");
-    const answer = secondSep === -1 ? content : content.substring(0, secondSep);
-    const hint = secondSep === -1 ? "" : content.substring(secondSep + 2);
+    const { answer, hint } = parseClozeContent(content);
     order += 1;
     if (mode === "back") {
-      html += `<span class="inline-answer">${answer}</span>`;
+      html += `<span class="inline-answer">${escapeHtml(answer)}</span>`;
     } else if (fillMode) {
       const value = draft?.[String(order)] || "";
       const placeholder = hint || "请输入";
       html += `<span class="fill-slot fill-slot-${fillMode}"><input class="fill-input" data-fill-index="${order}" value="${escapeAttribute(value)}" placeholder="${escapeAttribute(placeholder)}"></span>`;
     } else {
-      html += `<span class="inline-blank">${hint || "请作答"}</span>`;
+      html += `<span class="inline-blank">${escapeHtml(hint || "请作答")}</span>`;
     }
     cursor = end + 2;
   }
-  return normalizeMathHtml(html);
+  return normalizeMathInSafeHtml(html);
 }
 
 export function renderInlineCloze(question: string, mode: "front" | "back"): string {
-  return renderCloze(question, mode);
+  return renderCloze(escapeHtml(question), mode);
 }
 
 export function revealAnswer(): void {
@@ -492,7 +675,43 @@ export function mountAudio(container: HTMLElement, audioField: string): void {
 }
 
 export function renderTags(tags: string[]): string {
-  return tags.map((tag) => `<span class="tag-chip">${tag}</span>`).join("");
+  return tags.map((tag) => `<span class="tag-chip">${escapeHtml(tag)}</span>`).join("");
+}
+
+export function normalizeMasks(value: unknown): Mask[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+  const seenIds = new Set<string>();
+  const masks: Mask[] = [];
+  value.forEach((candidate, index) => {
+    if (!candidate || typeof candidate !== "object") {
+      return;
+    }
+    const x = Number("x" in candidate ? candidate.x : Number.NaN);
+    const y = Number("y" in candidate ? candidate.y : Number.NaN);
+    const w = Number("w" in candidate ? candidate.w : Number.NaN);
+    const h = Number("h" in candidate ? candidate.h : Number.NaN);
+    if (![x, y, w, h].every(Number.isFinite) || w <= 0 || h <= 0) {
+      return;
+    }
+    let id = trim("id" in candidate ? candidate.id : "") || String(index + 1);
+    if (seenIds.has(id)) {
+      id = `${id}-${index + 1}`;
+    }
+    seenIds.add(id);
+    const left = Math.max(0, Math.min(100, x));
+    const top = Math.max(0, Math.min(100, y));
+    masks.push({
+      id,
+      x: left,
+      y: top,
+      w: Math.max(0.1, Math.min(100 - left, w)),
+      h: Math.max(0.1, Math.min(100 - top, h)),
+      label: "label" in candidate && typeof candidate.label === "string" ? candidate.label : "",
+    });
+  });
+  return masks;
 }
 
 export function sortMasks(masks: Mask[], order: Settings["occlusionOrder"]): Mask[] {

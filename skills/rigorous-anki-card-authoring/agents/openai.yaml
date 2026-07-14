@@ -1,0 +1,4 @@
+version: 1
+display_name: Rigorous Anki Card Authoring
+short_description: Design and audit small Anki sections before approved implementation.
+default_prompt: Design one small Anki section at a time using the seven rigorous authoring principles; use the user's preferred/source language and compact, mobile-scannable learner text, with concise natural Chinese when applicable and technical English only when it improves precision or recognition; provide complete textual card drafts, a detailed 1–7 audit that checks these language/layout rules per card, every concept mentioned, each card's logic chain, and a hostile audit, then wait for explicit user confirmation before editing scripts or creating an APKG. After approval, use the existing 9-field contract and repository generation patterns.

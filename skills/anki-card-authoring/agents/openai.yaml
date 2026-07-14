@@ -1,4 +1,4 @@
 version: 1
 display_name: Anki Card Authoring
 short_description: Create Anki cards from simple study content without template internals.
-default_prompt: Create or revise Anki cards using the 9-field contract (`id`, `type`, `question`, `options`, `answer`, `notes`, strict JSON `extra`, `audio`, `occlusion_image`); keep authoring changes to card data/docs and do not rebuild or touch runtime files unless behavior changes.
+default_prompt: Create or revise Anki cards using the 9-field contract (`id`, `type`, `question`, `options`, plain-text `answer`, `notes`, strict JSON `extra`, `audio`, `occlusion_image`); preserve literal angle-bracket text, keep extra labels/node text non-HTML, and when editing Python generators use ordinary strings by default with `trusted_html(...)` only around final intentional rich-field HTML; use the user's preferred/source language and compact mobile-scannable text, and do not touch runtime files unless behavior changes.

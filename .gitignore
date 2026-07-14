@@ -8,3 +8,6 @@ node_modules/
 __pycache__/
 *.pyc
 *.apkg
+*.bak.*
+anki-open-template-test.apkg_1/
+banks/
