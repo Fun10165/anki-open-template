@@ -1,121 +1,263 @@
 ---
 name: guided-concept-learning
-description: Use when a user wants to learn, understand, or receive a rigorous explanation of a concept, mechanism, algorithm, or technical topic. Build understanding from the learner's relevant prior knowledge through a motivated main thread, precise definitions, operational detail, limitations, and a final coverage audit. Do not use this skill to create study cards.
+description: "用严格的契约做概念讲解与理解构建：从学习者已有的知识出发，沿一个例子给出动机驱动的主线、精确定义、可演算的轨迹、边界与失败情形，最后给出覆盖审计。用于「教我」「帮我理解」「这是怎么工作的」「解释这个概念」这类请求；也支持「敏捷学习」模式（用 git 仓库逐版迭代，把理解逐步建起来）。不用于制作记忆卡片。"
 ---
 
-# Guided Concept Learning
+# 指导式概念学习（Guided Concept Learning）
 
-Use this skill to help someone genuinely understand a concept, not merely collect terminology.
+本 skill 让「理解」变成可以验收的东西：给定一个主题，产出经得起追问的理解——它为什么存在、被什么需求逼出来、边界在哪里、改动一处会怎样。它只服务于理解与推理；若用户要记忆卡片，改用合适的制卡 skill。
 
-## Scope
+## 怎么读这份契约
 
-Use it for requests such as “teach me,” “help me understand,” “how does this work,” or “explain this concept.” Keep the result focused on learning and reasoning. Do not create Anki cards or introduce a card-authoring workflow; if the user asks for cards, use an appropriate card-authoring skill instead.
+每一节都是一份契约，写清四件事：
 
-## Language and Presentation
+| 项 | 含义 |
+|---|---|
+| **前置条件** | 动手前 MUST 成立什么 |
+| **后置条件** | 收工时 MUST 成立什么（可验收） |
+| **不变式** | 全过程 MUST 一直成立什么 |
+| **违约处理** | 条件不成立时 MUST 做什么——显式处理，MUST NOT 静默跳过 |
 
-Use the learner's preferred language, inferring it from the conversation and source material unless the learner explicitly overrides it. When the learner's language is Chinese, prefer concise, fluent Chinese for faster reading and avoid unnecessary English headings or boilerplate; retain indispensable technical terms, symbols, code, and canonical names. Keep formatting readable without excessive line breaks, especially when the material may later be reviewed on mobile. Compact presentation must never remove strict definitions, equations, traces, limitations, alternatives, or the mandatory coverage audit.
+关键词按 RFC 2119 解释：**MUST** / **MUST NOT**（= **NEVER**）/ **SHOULD** / **SHOULD NOT**（= **AVOID**）/ **MAY**。违反 MUST 与 NEVER 的产出视为失败：MUST 撤回重做，并说明违反的是哪一条。
 
-## Teaching Workflow
+## 总契约
 
-### 1. Determine the relevant knowledge range first
+- **前置条件**：主题已确定；学习者的相关知识范围已知、可从对话推断，或已写明假定。范围只取影响本主题的那部分：想理解或达成什么、已掌握哪些前置知识、对记号与术语与实现细节的熟悉程度、需要直觉还是数学还是实现（或全部）。范围不清时只问少量有针对性的诊断问题，不做大范围背景采访；能从现有材料讲起就直接写明起点并开始，允许学习者纠正。
+- **后置条件**：学习者能用自己的话讲清机制（为什么存在、被什么需求逼出来、边界在哪、改动一处会怎样）；覆盖审计通过。
+- **不变式**：
+  - 定义严格：术语在首次出现处给出非比喻定义，说清它作用于什么、产出什么；
+  - 动机先行：先有问题，再有机制；每个机制都能指回它解决的问题；
+  - 要素齐全：篇幅 MAY 压缩；严格定义、轨迹、局限、审计 MUST NOT 被删。
+- **违约处理**：出现没定义的概念 → 当场补；出现与事实不符的说法 → 改文本，并改承载它的历史；出现抢跑（预支后续概念）或堆砌（无用细节）→ 删除。
 
-Before explaining, identify only the learner knowledge that affects this topic:
+## 语言与呈现（不变式）
 
-- what they are trying to understand or accomplish
-- which prerequisites they already know
-- which notation, terminology, and implementation details they can use comfortably
-- whether they need intuition, mathematical precision, implementation ability, or all three
+- 用学习者的语言：对话与材料用什么语言就用什么语言；中文学习者用简洁流畅的中文，不必要的英文标题与样板 MUST NOT 出现（术语、符号、代码、专名保留原样）。
+- 格式可读：不过度折行，便于在移动端阅读；紧凑 MUST NOT 删掉严格定义、方程、轨迹、局限、替代与覆盖审计。
+- 反例、轨迹、图、具体状态让机制可见；类比 MAY 用——它 MUST 澄清一个具体的结构关系，MUST NOT 取代真实定义与机制；映射很快失效或加不出预测力时 MUST 删除。
 
-Use the conversation and supplied material first. Ask a few targeted diagnostic questions when the range is genuinely unclear; do not conduct a broad background interview. If a useful explanation can begin from available evidence, state the assumed starting point and proceed, allowing the learner to correct it.
+## 两种模式
 
-### 2. Establish motivation and a main thread
+| 模式 | 用在什么时候 | 产出 |
+|---|---|---|
+| **单次讲解** | 一次会话讲清一个主题 | 一条回复，包含完整旅程与覆盖审计 |
+| **敏捷学习** | 多次会话逐步建起来 | 一个 git 仓库；每版一个完整模型 |
 
-Start from the problem that makes the concept necessary. Prefer one concrete example whose complete journey can carry the explanation from input to result. Return to that same example as each mechanism is introduced.
+## 模式一：单次讲解
 
-Do not substitute a glossary-shaped list of definitions for a causal explanation. Definitions support the main thread; they are not the main thread by themselves.
+- **前置条件**：总契约的前置条件全部成立。
+- **后置条件**——回复 MUST 包含七项：
+  1. 假定的知识范围与学习目标；
+  2. 动机：问题从哪来、为什么需要这个机制；
+  3. 一个例子从输入走到结果的完整旅程；
+  4. 精确定义与判定规则（够算、够预测）；
+  5. 假设、适用边界、失败情形、替代方法及其更合适的条件；
+  6. 可演算的预测或轨迹；能实质帮助实现时，给出伪代码、方程、不变量或演算轨迹；
+  7. 覆盖审计。
+- **不变式**：
+  - 一个例子贯穿全篇：每个机制都在这个例子上落一步（词条清单 MUST NOT 顶替因果解释）；
+  - 从粗到精：先给直觉的第一次尝试，指出它含糊或错误的具体位置，再引入修复所需的最小机制，最后精确到可计算、可预测；适用时交代输入、输出、状态、判定规则与更新步骤；
+  - 深度随相关性：核心机制给完整轨迹；旁支给紧凑但完整的定义；
+  - 局限要早：决定性的假设与局限先于依赖它们的推理给出；改变整篇理解的那个局限 MUST NOT 留到结尾脚注；次要的边界情形可在相关时再引入；
+  - 不强行套小标题：短的讲解读起来更好时不必用；推理顺序与覆盖审计 MUST 保留。
+- **违约处理**：一次讲不完 → 转敏捷学习模式；证据不足 → 明说「这一点未核实」，MUST NOT 猜。
 
-### 3. Move from a rough solution to a precise one
+## 模式二：敏捷学习（git 管理的版本迭代）
 
-Guide the learner through this progression:
+### 这个模式在做什么（context / 目的 / 预期效果）
 
-1. formulate an intuitive first attempt
-2. show exactly where it is ambiguous, inefficient, or incorrect
-3. introduce the minimum new mechanism needed to repair it
-4. make the result precise enough to calculate, predict, or implement
-5. walk the main example through the precise mechanism end to end
+**context**：学习者要真正理解一个机制或系统——理解必须经得起追问（它为什么存在、由什么需求逼出来、边界在哪里、改动一处会怎样）。一次讲清很难达到这一点：内容一次堆出，主次不分、记不住；讲师还容易把「现状中的全部细节」倒进来，而其中很多只反映实现之间的偶然差异，对理解没有帮助。
 
-The final account should expose inputs, outputs, state, decision rules, and update steps where applicable. Provide pseudocode, equations, invariants, or a worked trace when they materially make the solution implementable.
+**目的**：把理解当成一个项目来迭代。每一版是一个完整的、但粗糙的模型；下一版由上一版暴露的问题驱动（上一版解释不了的观察）。学习者在任何一步都能回答「这一版为什么长这样」，也能看清它还没覆盖什么。
 
-### 4. Surface important limitations early
+**预期效果**：
 
-For a complex topic, state decisive assumptions and limitations before the learner builds reasoning on a false model. Explain, as comprehensively as useful:
+- 学习者能用自己的话把机制讲清：它由哪些需求一步步逼出来，每一步解决了什么；
+- 每一版都完整、能被一个例子跑通；读者只看当前版也能自洽地理解；
+- git 历史本身就是理解过程的记录——提交信息写「动机 → 机制」，任何时候都能回看某一版的样子，以及它为什么变成下一版。
 
-- assumptions the method depends on
-- the situations in which it applies
-- boundaries beyond which its model no longer fits
-- common and consequential failure cases
-- alternative methods and when their assumptions make them a better fit
+### 契约
 
-Do not bury a limitation that changes the interpretation of the whole explanation in an ending footnote. Less central edge cases may be introduced when they become relevant to the main thread.
+- **前置条件**：主题已确定；仓库位置可用；知识范围已询问，或已写明假定并允许纠正。
+- **后置条件**：每一版满足「子契约 3」；全部结束后，git 历史本身是一份可回看的理解记录。
+- **不变式**：
+  - 机制一个不少：每版的模型包含此前引入的全部机制（为什么：读者只看当前文件；某个已引入的机制缺了，依赖它的推理就无从落脚）；
+  - 动机可叠加、模型一次一个整体：文字 MAY 删改、替换、重写，MUST NOT 在原模型后面直接追加；新机制的动机 SHOULD 来自「上一版解释不了的观察」（反例驱动优先于推理驱动），MUST 写成新段落；
+  - 抽象优先：能抽象化而不影响理解的，MUST NOT 具体化；
+  - 不抢跑：幼稚阶段 MUST NOT 预支后续概念；缺口只指出、不展开；
+  - 写作纪律（子契约 6）全程成立。
+- **违约处理**：违反 MUST 或 NEVER 的版本 MUST 撤回重做。
 
-### 5. Teach vividly without decorative analogies
+### 子契约 1：仓库
 
-Use concrete states, traces, diagrams, counterexamples, and visible transformations to make the mechanism vivid. An analogy is optional and must clarify a specific structural relationship. Never let an analogy replace the real definition or mechanism, and remove it if the mapping breaks quickly or adds no predictive power.
+- 前置：主题已确定。
+- 后置：一个 git 仓库；工作区只放当前版本的完整模型。
+- 不变式：MUST NOT 保留旧版本、带版本号的小节、或变更记录——历史由 git 承载（`git log --oneline`、`git show <commit>`）；文件 MAY 用普通 markdown，模型、动机、缺口清单 MAY 同放一个文件（例如 `README.md`）——MUST 三者分区清楚。
+- 违约处理：工作区出现旧版本内容 → 删除；旧文字由 git 历史承载。
 
-## Strict-Definition Contract
+### 子契约 2：起点版本（v0）：最原始的想法
 
-Maintain an internal coverage ledger while writing. Add every concept, term, symbol, abbreviation, operation, or method that the learner may not already know and that the explanation relies on.
+- 前置：仓库已就绪；为理解仓库而读现有实现 MAY——读取 MUST 带着一个明确的问题（「这个机制为什么存在、主干流程是什么」）。
+- 后置：v0 已提交；内容是这个问题「最小、最抽象、最幼稚」的一个想法（几十行为宜）。
+- 不变式：
+  - v0 MUST 从「这个问题最初为什么存在」出发，MUST NOT 从「现在的实现长什么样」出发；
+  - v0 MUST NOT 是「现有版本的片段选取」：NEVER 写成对任何现有实现的摘录、裁剪或对照；
+  - NEVER 把学习笔记对应到现有代码文件；笔记 MUST NOT 成为现有代码的导读；
+  - 读取 MUST 在能写清核心机制时就停：MUST NOT 继续下钻实现细节、异常分支与边界处理；
+  - v0 MAY 完全没有边界条件、MAY 没有任何设计；「没用的东西」MUST NOT 出现；
+  - 一个合格的 v0 例：posix 笔记的第一版——「三档身份 × 三种操作 + 为什么用位图」，一页以内。
+- **违约处理**：动笔前 MUST 先写清「接下来输出的是什么」——v0，一个最原始的想法，MUST NOT 是完整设计，MUST NOT 是当前仓库版本的片段；停读后 MUST 立刻动笔，MUST NOT 以「再读一点更保险」为由继续读。提交前 MUST 自检：是否短到像「第一次遇到这个问题的人提出的想法」；一眼能看出是从现有实现里摘出来的内容，MUST 删除。
 
-For each ledger item:
+### 子契约 3：每一版
 
-1. give a clear, non-metaphorical definition at first use or immediately nearby
-2. state what it operates on and what result it produces
-3. explain its operational mechanism or decision rule
-4. provide mathematical detail where applicable, defining every symbol, unit, index, and convention used
-5. connect it to the main example with an actual step, not merely another analogy
-6. distinguish it from easily confused neighboring concepts when that distinction matters
+- 前置：上一版已提交；本版回答的缺口已从清单选定。
+- 后置（本版的结构 MUST 为）：知识范围（先询问，或写明假定并允许纠正）→ 动机 → 模型 → 缺口清单 → 概念覆盖审计。
+- 不变式：
+  - 只引入一个机制（回答当前缺口所需的最小增量）——一次上多个，就说不清哪个需求逼出了哪个机制；
+  - MAY 粗糙、MAY 边界不明确；MUST 有动机、MUST 能承接下一版；
+  - 术语在首次出现处给出一个非比喻定义即可——定义 MAY 幼稚，MUST 随迭代一起变得更精确；
+  - MUST 用一个例子把本版的模型跑一遍（端到端）；具体状态、轨迹、反例、可见变换 MAY 用——只要与当前（可能还幼稚的）模型匹配，MUST NOT 借它们把模型提前拉向更严格的形态；
+  - 局限、失败与替代只写「内在矛盾型」：用本版的定义与模型就能推出来的边界与失效情形；MUST NOT 用后面的版本才知道的结论倒推；MUST NOT 把扩展需求或未 spec 清楚型的内容当作局限；
+  - 顺序与深度 MUST 大体合理：前置概念先于依赖它的概念，核心机制给完整轨迹、旁支给紧凑但完整的定义；MUST NOT 在幼稚阶段预先整理后来才会浮现的概念；知识性的假定（读者已知什么）MAY 提前写明；
+  - 缺口在版本里 MAY 被指出，但 MUST NOT 展开：只说明「本版模型还没覆盖」，MUST NOT 急着跳去更严格的形态；
+  - 每版 MUST 以实际动作推进：读完即写、写完即提交；MUST NOT 以「接下来将要做 X」结束一轮而没有实际调用。
+- 违约处理：
+  - 模型缺失已引入的机制（残缺）→ 补回；在旧文字后面直接追加（堆叠）→ 改写成单一整体；
+  - 违反 MUST 的版本 MUST 撤回重做。
 
-Do not define an unfamiliar concept only through another undefined concept. Order prerequisites before dependents, or briefly define a prerequisite before using it. Familiarity with a broad subject does not imply familiarity with every specialized term inside it.
+### 子契约 4：缺口清单（下一版的动机池）
 
-Depth should follow relevance: a side concept may receive a compact but complete definition, while the central mechanism receives a full trace. Strict coverage does not require bloating every explanation to the same length.
+- 前置：本版模型已定稿。
+- 后置：清单显式列出「故意留下的不明确处」；每条标注类型。
+- 不变式：
+  - 类型三类，决定「解决它要做什么」：**内在矛盾**（现有规则产生的行为与需求冲突；解决要调和规则或补一个补偿机制）／**未 spec 清楚**（机制已存在或已规定，模型没覆盖；解决是补描述）／**扩展需求**（模型表达不了的、被需要的能力；解决是加结构）；
+  - 缺口被回答后 MUST 从清单移除；新暴露的问题 MUST 加入——清单是活的路线图。
+- 违约处理：清单缺失 → 本版 MUST NOT 提交。
 
-## Quality Examples
+### 子契约 5：提交约定
 
-### Cache: insufficient versus rigorous
+- 前置：本版内容已定稿。
+- 后置：一次提交；提交信息采用「动机 → 机制」。
+- 不变式：
+  - `v0: <动机> → <机制>`（起点版本）与 `vN: <动机> → <机制>`（后续版本）——一版模型；
+  - `vN 反思: ...`——在版本之上追加反思（通常就是缺口清单的更新）；
+  - `vN 澄清: ...` / `vN 修正: ...`——表述上的打磨与纠错。
+- 违约处理：只写「改了什么」的提交信息 MUST 重写。
 
-**Insufficient:** “A cache is a small, fast cupboard near the CPU. A cache hit means the requested item is already there.” This may suggest speed, but it does not let the learner determine where an address is checked or predict a hit.
+### 子契约 6：写作纪律（贯穿全部产出）
 
-**Required standard of rigor:** Assume byte-addressed main memory with an $A$-bit address, a direct-mapped cache with $S=2^s$ cache lines, and a block size of $B=2^b$ bytes. Define the address, from low to high bits, as: a $b$-bit **block offset** $[b-1:0]$ selecting the target byte inside the cached block; an $s$-bit **index** $[b+s-1:b]$ uniquely selecting the cache line; and an $A-(s+b)$-bit **tag** in the remaining high bits identifying which main-memory block currently occupies that line. Given an address, retain its offset, use the index to select one line, and read that line's **valid bit**. If valid is 0, the access is a miss. If valid is 1, compare the stored tag bit-for-bit with the address tag: equality means a hit, so use the offset to select the requested byte; inequality means a miss. On a miss, fetch the entire aligned $2^b$-byte block from the next memory level, write it into the indexed line, update the stored tag, set valid to 1, and return the requested data.
+- 抽象优先：凡能抽象化而不影响理解的，MUST 抽象化，MUST NOT 具体化。判断标准是「去掉它，理解会不会受损」——不会受损的具体细节就是在描述无用的东西。
+- 只保留承载机制理解的细节；对理解没有帮助的、只是现实世界状态多而变复杂的、不持久的、没有内在思想的、业务化或 CRUD 化的东西，MUST NOT 出现。
+  - 反例：罗列不同提供方的工具 schema 差异（谁用什么字段名）、实现里的类型名、函数名、事件名清单。
+  - 正例：「不同提供方对工具调用的表达各不相同，于是需要一个统一抽象」——写到这个抽象程度就够；具体差异表属于无用的细节。
+- 术语 MUST 严格：MUST 直接描述机制的真实行为，MUST NOT 用比喻式说法（例如把「上下文按顺序不断叠加」说成「记忆」——会让人误以为模型有记忆）。
+- 没有明确含义的生造词 MUST NOT 出现，除非它是业界通行的标准词语（例如「上下文窗口」「工具调用」「JSON Schema」）。例：「回填」MUST NOT 出现，MUST 写成它的真实含义——「把工具结果按相同 id 以适当格式放入上下文」。
+- 表述 MUST 是正常汉语：不成词的生造说法（例如把「三步」写成「三拍」）与翻译腔 MUST NOT 出现。
+- 理解所必需的例子 MUST 具体到可验证（真实的程序、路径、数字）：「某个 setuid 程序」不如写成 `/usr/bin/passwd` 及其 `ls -l` 形态与 `(real, effective, saved) = (1000, 0, 0)`。
+- 运算描述 MUST 精确，MUST 选用经得起核对的数学词（`请求值 & ~umask` 是取差集）。
+- 写进模型前 SHOULD 对照原始来源核对（标准原文、手册页）；发现说法出错，MUST 改文件，MUST 把承载它的历史一并修正。
 
-This address-bit definition and hit flow are the benchmark for operational precision. Match their rigor where a topic needs it; do not copy their length into unrelated simple explanations.
+### 子契约 7：概念覆盖审计
 
-### K-means: glossary versus motivated journey
+- 前置：本版模型已定稿。
+- 后置：审计列出本版模型里出现过的概念，并指向每个概念的定义。
+- 不变式：没有被定义的 MUST 当场补上（补不上就只记「本版还没覆盖」，不展开）。
+- 违约处理：审计缺失 → 本版 MUST NOT 提交。
 
-**Weak:** List “centroid,” “distance,” “assignment,” and “iteration,” then give one-sentence definitions without showing why the learner needs them or how a dataset changes.
+### 示例
 
-**Strong:** Begin with a concrete dataset of numerical points that must be divided into $k$ groups. Let the learner first solve the limiting cases $k=1$ and $k=n$, then ask how to optimize one fixed cluster's center. Connect this derivation to the already-known idea of moment of inertia only if the learner knows it, and calculate that the cluster's arithmetic mean minimizes the sum of squared distances. State early that the general k-means problem has no universal closed-form solution, so an iterative method is needed. Then derive and execute Lloyd's loop: for data points $x_i$, initialize centers $\mu_1,\ldots,\mu_k$; assign point $i$ to group $c_i=\arg\min_j\lVert x_i-\mu_j\rVert_2^2$, where $\arg\min$ returns the index $j$ with the smallest value; replace each $\mu_j$ by the coordinate-wise arithmetic mean of points assigned to group $j$; and repeat until assignments stop changing or the decrease in $J=\sum_i\lVert x_i-\mu_{c_i}\rVert_2^2$ falls below a stated threshold. Define every symbol and trace actual points through assignment and update. Make clear that Lloyd's algorithm is not the only method: state its assumptions and favorable cases, show boundaries such as unequal feature scales, initialization sensitivity, outliers, empty clusters, and convergence to a local rather than global minimum, then describe the major alternative methods as comprehensively as useful and say which violated assumption or failure case each alternative addresses.
+本 skill 自带一个完整的实例：`examples/posix-perms-notes/`（POSIX 权限系统的逐版笔记）。它保留完整 git 历史——`git log --oneline` 看迭代轨迹，`git show <hash>` 逐个看每版的 diff；工作区里的 `README.md` 是当前版本的完整模型。
 
-## Response Shape
+## 术语定义契约
 
-Adapt length and form to the topic, but normally include:
+术语在首次出现处满足六条（「定义严格」的展开）：
 
-1. assumed learner range and learning target
-2. motivating problem and main example
-3. intuitive rough solution and its gap
-4. precise definitions and mechanism developed along the example's journey
-5. assumptions, applicability boundaries, failure cases, and useful alternatives
-6. a worked prediction, calculation, trace, or implementation sketch when applicable
-7. the coverage audit
+1. 给出非比喻的定义；
+2. 说清它作用于什么、产出什么；
+3. 给出判定规则或运算机制；
+4. 适用时给数学细节——每个符号、单位、约定都定义；
+5. 与主线例子用**实际步骤**连接；
+6. 与易混概念区分（例如「上下文」与「记忆」这类相邻概念的切分）。
 
-Do not force headings when a short explanation reads better, but preserve the reasoning sequence and audit.
+**不变式**：不用未定义的概念去定义新概念；前置概念先于依赖它的概念；深度随相关性——核心机制给完整轨迹，旁支给紧凑但完整的定义；熟悉一个大领域 MUST NOT 被当成熟悉其中每个专门术语。
 
-## Mandatory Coverage Audit
+**违约处理**：某个术语只有名字、只有类比、或循环定义 → 补定义。
 
-End every explanation with a concise **Coverage audit**. List every potentially unfamiliar concept actually mentioned in the response and point to where it was given a non-metaphorical definition and, where applicable, operational or mathematical detail. Verify that:
+## 覆盖审计契约
 
-- no term is only named, analogized, or circularly defined
-- every symbol and abbreviation is expanded or defined
-- every alternative method mentioned is defined enough for the comparison being made
-- assumptions, boundaries, and failure cases needed for independent reasoning were covered
+- **前置**：讲解（或某一版）已定稿。
+- **后置**：审计列出所有出现过、且读者可能不熟悉的概念，逐项指向它的定义位置。
+- **不变式**：逐项核对——没有术语只有名字或只有类比；每个符号与缩写都被展开；每个提到的替代方法都有足以比较的定义；独立推理所需的假设、边界、失败情形都覆盖。
+- **违约处理**：任何一项没通过 → 修补后再交付；MUST NOT 把没解释的项当成无碍的省略。
 
-If an item fails the audit, repair the explanation before sending it. Do not report an unexplained item as a harmless omission.
+## 质量样例（两则对照）
+
+### 缓存：不足 vs 严格
+
+**不足**（两种典型写法）：
+
+其一——只写表面作用、没有机制（判断不了地址在哪一步被检查，也预测不了命中）：
+
+> 索引：决定该块会放置到哪个缓存行。
+> 标记：存在缓存行里，用来识别此时缓存行里到底是哪个内存块（因为同一个索引可以对应多个不同标记的块）。
+
+其二——只给比喻：
+
+「缓存是靠近 CPU 的小而快的柜子；缓存命中就是想要的东西已经在那里。」——这给不出可预测的机制。
+
+**严格**：
+
+#### 严格定义（基于地址位字段）
+
+假设以下参数都已给定：
+
+- 主存按字节编址，地址位宽 A 位；
+- cache 被组织为 S = 2^s 个缓存行（即行数）；
+- 每个缓存行存储 B = 2^b 字节的数据块（块大小）。
+
+在这些确定参数下，**任何主存地址都可以无歧义地划分成三个连续的位字段**（从低位到高位）：
+
+1. **块内偏移（offset）**
+   - 位数：b 位；
+   - 位置：地址的最低 b 位（位 [b-1:0]）；
+   - 作用：选定目标数据在缓存行数据块内部的第几个字节。
+2. **索引（index）**
+   - 位数：s 位；
+   - 位置：紧接在偏移字段之上，即地址的位 [b+s-1 : b]；
+   - 作用：唯一指定该地址对应的主存块应当被放置在 cache 的哪个行。硬件用这 s 位直接作为行选择信号。
+3. **标记（tag）**
+   - 位数：A - (s + b) 位；
+   - 位置：地址的最高 A - (s + b) 位（即剩余的位）；
+   - 作用：存放在所选缓存行的 tag 字段中。在访问时，与地址中提取的 tag 进行**相等比较**，以确定当前缓存行中存储的数据块是否正是请求的那一块。
+
+#### 操作定义（命中判断流程）
+
+给定一个主存地址：
+
+1. 提取地址的 **offset** 字段，留待后续选字节。
+2. 提取地址的 **index** 字段，将其作为行号选中 cache 中的唯一一行。
+3. 读取该行的 **valid** 位。若 `valid = 0`，则缺失（miss）。
+4. 若 `valid = 1`，则提取该行存储的 **tag** 字段，与地址中的 **tag** 进行逐位相等比较。
+   - 若相等，则命中（hit），使用 offset 从该行的数据块中取出目标字节。
+   - 若不相等，则缺失（miss）。
+5. 缺失时，硬件从下一级存储（主存）读取包含目标地址的整个块（大小为 2^b 字节），将其写入由 index 指定的缓存行，并将该行的 tag 字段更新为地址的 tag，valid 置为 1。然后返回请求数据。
+
+要点：严格的标准是「能算、能预测」；只有在简单主题上才可以压缩，MUST NOT 拿长度当严格。
+
+### k-means：词条 vs 旅程
+
+**弱**（两种典型写法）：
+
+其一——报一个算法名就当讲完：
+
+> 解决 k-means 问题，有 Lloyd 算法。
+
+其二——只列词条：
+
+列出「质心」「距离」「分配」「迭代」，各给一句话。
+
+**强**：解决 k-means 问题，我们可以先从简单的情况考虑：k=1、k=n 的情况，一个簇内怎么单独优化中心点？经过思考和计算，借用已经学过的转动惯量的概念，可以发现是簇的质心最优（学习者不知道转动惯量时，先把这个前置概念补上）。考虑到 k-means 问题没有通用的解析解（对于过于复杂的问题，可以先告诉用户一些限制，方便用户思维尽量能独立想出解决方法），考虑使用算法来获得较优解，可以尝试迭代：对数据点 x_i，初始化中心 μ_1, …, μ_k；把点 i 分配给组 c_i = arg min_j ‖x_i − μ_j‖²（arg min 返回使值最小的下标 j）；用分配给该组的点的坐标均值替换每个 μ_j；重复直到分配不再变化、或目标 J = Σ_i ‖x_i − μ_{c_i}‖² 的下降低于给定阈值。每个符号都要定义，并用真实的数据点把「分配—更新」的循环走一遍。
+
+同时，Lloyd 算法不是唯一算法：这个算法有它的假定；它在什么样的问题下表现良好，在什么样的问题边界下会出问题（特征尺度不一、初始化敏感、离群点、空簇、收敛到局部最优）；此外还有哪些替代方法、各自能解决哪一类问题——尽可能详细地列举所有方法。
+
+要点：定义服务于旅程；词条清单 MUST NOT 顶替因果解释。
